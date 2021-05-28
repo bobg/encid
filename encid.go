@@ -17,7 +17,7 @@ import (
 // and has an associated "type" (an int) and a unique key ID (an int64).
 // These keys can be used to encrypt other int64s,
 // and to decrypt the resulting strings.
-// See EncodeID and DecodeID.
+// See Encode and Decode.
 type KeyStore interface {
 	// GetByID gets an encryption key and its type by the key's ID.
 	// If no key with the given ID is found,
@@ -35,22 +35,22 @@ type KeyStore interface {
 // ErrNotFound is the type of error produced when KeyStore methods find no key.
 var ErrNotFound = errors.New("not found")
 
-// EncodeID encodes a number n using a key of the given type from the given keystore.
+// Encode encodes a number n using a key of the given type from the given keystore.
 // The result is the ID of the key used, followed by the encrypted string.
 // The encrypted string is expressed in base 30,
 // which uses digits 0-9, then lower-case bcdfghjkmnpqrstvwxyz.
 // It excludes vowels (to avoid inadvertently spelling naughty words) and lowercase "L".
-func EncodeID(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string, error) {
-	return encodeID(ctx, ks, typ, n, rand.Reader, basexx.Base30)
+func Encode(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string, error) {
+	return encode(ctx, ks, typ, n, rand.Reader, basexx.Base30)
 }
 
-// EncodeID50 is the same as EncodeID but it expressed the encrypted string in base 50,
+// Encode50 is the same as Encode but it expressed the encrypted string in base 50,
 // which uses digits 0-9, then lower-case bcdfghjkmnpqrstvwxyz, then upper-case BCDFGHJKMNPQRSTVWXYZ.
-func EncodeID50(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string, error) {
-	return encodeID(ctx, ks, typ, n, rand.Reader, basexx.Base50)
+func Encode50(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string, error) {
+	return encode(ctx, ks, typ, n, rand.Reader, basexx.Base50)
 }
 
-func encodeID(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Reader, base basexx.Base) (int64, string, error) {
+func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Reader, base basexx.Base) (int64, string, error) {
 	keyID, encKey, err := ks.GetByType(ctx, typ)
 	if err != nil {
 		return 0, "", errors.Wrapf(err, "getting key with type %d from keystore", typ)
@@ -83,22 +83,22 @@ func encodeID(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.R
 	return keyID, string(destbuf[len(destbuf)-nbytes:]), nil
 }
 
-// DecodeID decodes a keyID/string pair produced by EncodeID.
+// Decode decodes a keyID/string pair produced by Encode.
 // It produces the type of the key that was used, and the bare int64 value that was encrypted.
 // As a convenience, it maps the input string to all lowercase before decoding.
-func DecodeID(ctx context.Context, ks KeyStore, keyID int64, inp string) (int, int64, error) {
-	return decodeID(ctx, ks, keyID, strings.ToLower(inp), basexx.Base30)
+func Decode(ctx context.Context, ks KeyStore, keyID int64, inp string) (int, int64, error) {
+	return decode(ctx, ks, keyID, strings.ToLower(inp), basexx.Base30)
 }
 
-// DecodeID50 decodes a keyID/string pair produced by EncodeID50.
+// Decode50 decodes a keyID/string pair produced by Encode50.
 // It produces the type of the key that was used, and the bare int64 value that was encrypted.
-// Unlike DecodeID, this does not map the input to lowercase first,
+// Unlike Decode, this does not map the input to lowercase first,
 // since base50 strings are case-sensitive.
-func DecodeID50(ctx context.Context, ks KeyStore, keyID int64, inp string) (int, int64, error) {
-	return decodeID(ctx, ks, keyID, inp, basexx.Base50)
+func Decode50(ctx context.Context, ks KeyStore, keyID int64, inp string) (int, int64, error) {
+	return decode(ctx, ks, keyID, inp, basexx.Base50)
 }
 
-func decodeID(ctx context.Context, ks KeyStore, keyID int64, inp string, base basexx.Base) (int, int64, error) {
+func decode(ctx context.Context, ks KeyStore, keyID int64, inp string, base basexx.Base) (int, int64, error) {
 	typ, encKey, err := ks.GetByID(ctx, keyID)
 	if err != nil {
 		return 0, 0, errors.Wrapf(err, "getting key with ID %d", keyID)

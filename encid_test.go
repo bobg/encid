@@ -3,14 +3,13 @@ package encid
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/bobg/basexx"
 )
 
-func TestEncodeID(t *testing.T) {
+func TestEncode(t *testing.T) {
 	cases := []struct {
 		typ       int
 		n         int64
@@ -39,7 +38,7 @@ func TestEncodeID(t *testing.T) {
 				base = basexx.Base30
 			}
 
-			gotKeyID, gotStr, err := encodeID(ctx, ks, c.typ, c.n, zeroBytes, base)
+			gotKeyID, gotStr, err := encode(ctx, ks, c.typ, c.n, zeroBytes, base)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -54,7 +53,7 @@ func TestEncodeID(t *testing.T) {
 	}
 }
 
-func TestDecodeID(t *testing.T) {
+func TestDecode(t *testing.T) {
 	cases := []struct {
 		inpKeyID int64
 		inpStr   string
@@ -82,7 +81,7 @@ func TestDecodeID(t *testing.T) {
 				base = basexx.Base30
 			}
 
-			gotType, gotN, err := decodeID(ctx, ks, c.inpKeyID, c.inpStr, base)
+			gotType, gotN, err := decode(ctx, ks, c.inpKeyID, c.inpStr, base)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -108,10 +107,6 @@ func (tks testKeyStore) GetByType(ctx context.Context, typ int) (int64, []byte, 
 	id := int64(typ)
 	_, k, err := tks.GetByID(ctx, id)
 	return id, k, err
-}
-
-func (tks testKeyStore) Put(context.Context, int, []byte) (int64, error) {
-	return 0, errors.New("unimplemented")
 }
 
 type zeroByteSource struct{}
