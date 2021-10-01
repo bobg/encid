@@ -44,7 +44,7 @@ func Encode(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string, 
 	return encode(ctx, ks, typ, n, rand.Reader, basexx.Base30)
 }
 
-// Encode50 is the same as Encode but it expressed the encrypted string in base 50,
+// Encode50 is the same as Encode but it expresses the encrypted string in base 50,
 // which uses digits 0-9, then lower-case bcdfghjkmnpqrstvwxyz, then upper-case BCDFGHJKMNPQRSTVWXYZ.
 func Encode50(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string, error) {
 	return encode(ctx, ks, typ, n, rand.Reader, basexx.Base50)
@@ -65,7 +65,7 @@ func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Rea
 	nbytes := binary.PutVarint(buf[:], n)
 	_, err = io.ReadFull(randBytes, buf[nbytes:])
 	if err != nil {
-		return 0, "", errors.Wrap(err, "filling cipher block with random bytes")
+		return 0, "", errors.Wrap(err, "padding cipher block with random bytes")
 	}
 
 	cipher.Encrypt(buf[:], buf[:])
