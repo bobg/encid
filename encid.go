@@ -19,17 +19,21 @@ import (
 // and to decrypt the resulting strings.
 // See Encode and Decode.
 type KeyStore interface {
-	// GetByID gets an encryption key and its type by the key's ID.
+	// DecoderByID looks up a key in the store by its ID.
+	// It returns the key's type and a function for decrypting a data block using the key.
+	// The slice arguments to the decryption function must overlap entirely or not at all.
 	// If no key with the given ID is found,
 	// ErrNotFound is returned.
-	GetByID(context.Context, int64) (int, []byte, error)
+	DecoderByID(context.Context, int64) (int, func(dst, src []byte), error)
 
-	// GetByType gets a key of the given type, and its ID.
+	// EncoderByType looks up a key in the store by its type.
+	// It returns the key's ID and a function for encrypting a data block using the key.
+	// The slice arguments to the encryption function must overlap entirely or not at all.
 	// In case there are multiple keys of the given type,
 	// it is up to the implementation to choose one and return it.
 	// If no key with the given type is found,
 	// ErrNotFound is returned.
-	GetByType(context.Context, int) (int64, []byte, error)
+	EncoderByType(context.Context, int) (int64, func(dst, src []byte), error)
 }
 
 // ErrNotFound is the type of error produced when KeyStore methods find no key.
@@ -51,14 +55,9 @@ func Encode50(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string
 }
 
 func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Reader, base basexx.Base) (int64, string, error) {
-	keyID, encKey, err := ks.GetByType(ctx, typ)
+	keyID, enc, err := ks.EncoderByType(ctx, typ)
 	if err != nil {
 		return 0, "", errors.Wrapf(err, "getting key with type %d from keystore", typ)
-	}
-
-	cipher, err := aes.NewCipher(encKey)
-	if err != nil {
-		return 0, "", errors.Wrapf(err, "creating cipher from key with ID %d", keyID)
 	}
 
 	var buf [aes.BlockSize]byte
@@ -68,19 +67,19 @@ func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Rea
 		return 0, "", errors.Wrap(err, "padding cipher block with random bytes")
 	}
 
-	cipher.Encrypt(buf[:], buf[:])
+	enc(buf[:], buf[:])
 
 	var (
 		src     = basexx.NewBuffer(buf[:], basexx.Binary)
 		destbuf = make([]byte, basexx.Length(256, base.N(), aes.BlockSize))
 		dest    = basexx.NewBuffer(destbuf, base)
 	)
-	nbytes, err = basexx.Convert(dest, src)
+	_, err = basexx.Convert(dest, src)
 	if err != nil {
 		return 0, "", errors.Wrapf(err, "converting %x to base%d", buf[:], base.N())
 	}
 
-	return keyID, string(destbuf[len(destbuf)-nbytes:]), nil
+	return keyID, string(dest.Written()), nil
 }
 
 // Decode decodes a keyID/string pair produced by Encode.
@@ -99,7 +98,7 @@ func Decode50(ctx context.Context, ks KeyStore, keyID int64, inp string) (int, i
 }
 
 func decode(ctx context.Context, ks KeyStore, keyID int64, inp string, base basexx.Base) (int, int64, error) {
-	typ, encKey, err := ks.GetByID(ctx, keyID)
+	typ, dec, err := ks.DecoderByID(ctx, keyID)
 	if err != nil {
 		return 0, 0, errors.Wrapf(err, "getting key with ID %d", keyID)
 	}
@@ -114,12 +113,7 @@ func decode(ctx context.Context, ks KeyStore, keyID int64, inp string, base base
 		return 0, 0, errors.Wrapf(err, "converting %s from base%d", inp, base.N())
 	}
 
-	cipher, err := aes.NewCipher(encKey)
-	if err != nil {
-		return 0, 0, errors.Wrapf(err, "creating cipher from key with ID %d", keyID)
-	}
-
-	cipher.Decrypt(destbuf[:], destbuf[:])
+	dec(destbuf[:], destbuf[:])
 
 	n, _ := binary.Varint(destbuf[:])
 	return typ, n, nil

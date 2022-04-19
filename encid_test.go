@@ -2,6 +2,8 @@ package encid
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/binary"
 	"fmt"
 	"testing"
@@ -97,16 +99,27 @@ func TestDecode(t *testing.T) {
 
 type testKeyStore struct{}
 
-func (tks testKeyStore) GetByID(_ context.Context, keyID int64) (int, []byte, error) {
+func (tks testKeyStore) cipherByID(keyID int64) (cipher.Block, error) {
 	var buf [16]byte
 	binary.BigEndian.PutUint32(buf[:], uint32(keyID))
-	return int(2 - keyID%2), buf[:], nil
+	return aes.NewCipher(buf[:])
 }
 
-func (tks testKeyStore) GetByType(ctx context.Context, typ int) (int64, []byte, error) {
+func (tks testKeyStore) DecoderByID(_ context.Context, keyID int64) (int, func(dst, src []byte), error) {
+	ciph, err := tks.cipherByID(keyID)
+	if err != nil {
+		return 0, nil, err
+	}
+	return int(2 - keyID%2), ciph.Decrypt, err
+}
+
+func (tks testKeyStore) EncoderByType(ctx context.Context, typ int) (int64, func(dst, src []byte), error) {
 	id := int64(typ)
-	_, k, err := tks.GetByID(ctx, id)
-	return id, k, err
+	ciph, err := tks.cipherByID(id)
+	if err != nil {
+		return 0, nil, err
+	}
+	return id, ciph.Encrypt, err
 }
 
 type zeroByteSource struct{}

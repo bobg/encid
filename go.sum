@@ -1,4 +1,4 @@
-github.com/bobg/basexx v0.0.0-20191130163404-b0c4bda224a5 h1:pPQao/LZD4W8kXPb+TRUGUoT2uXqN11mAOAJ9kAx3gU=
-github.com/bobg/basexx v0.0.0-20191130163404-b0c4bda224a5/go.mod h1:TUZ3/ZfQrnD0AMpTd+1qeiJ8ogd4fo5wbs4d3lwJUD0=
+github.com/bobg/basexx v1.0.0 h1:VHxQcrZV0I5NaGftCuTm93hRd//UtaiwPeJ7wh55BK4=
+github.com/bobg/basexx v1.0.0/go.mod h1:TUZ3/ZfQrnD0AMpTd+1qeiJ8ogd4fo5wbs4d3lwJUD0=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
