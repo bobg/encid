@@ -4,11 +4,44 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"testing/quick"
 
 	"github.com/bobg/basexx"
 
 	"github.com/bobg/encid/testutil"
 )
+
+func TestEncodeDecode(t *testing.T) {
+	var (
+		ctx = context.Background()
+		ks  = &testutil.KeyStore{NumTypes: 100}
+	)
+	err := quick.Check(func(n int64) bool {
+		if n <= 0 {
+			return true
+		}
+		for typ := 1; typ < 100; typ++ {
+			keyID, str, err := Encode(ctx, ks, typ, n)
+			if err != nil {
+				t.Logf("Error encoding (%d, %d): %s", typ, n, err)
+				return false
+			}
+			gotTyp, gotN, err := Decode(ctx, ks, keyID, str)
+			if err != nil {
+				t.Logf("Error decoding (%d, %s): %s\n", keyID, str, err)
+				return false
+			}
+			if gotTyp != typ || gotN != n {
+				t.Logf("Decode(Encode(%d, %d)) = (%d, %d)", typ, n, gotTyp, gotN)
+				return false
+			}
+		}
+		return true
+	}, nil)
+	if err != nil {
+		t.Error(err)
+	}
+}
 
 func TestEncode(t *testing.T) {
 	cases := []struct {
@@ -27,7 +60,7 @@ func TestEncode(t *testing.T) {
 	}
 
 	var (
-		ks        testutil.KeyStore
+		ks        = &testutil.KeyStore{NumTypes: 100}
 		zeroBytes zeroByteSource
 		ctx       = context.Background()
 	)
@@ -71,7 +104,7 @@ func TestDecode(t *testing.T) {
 	}
 
 	var (
-		ks  testutil.KeyStore
+		ks  = &testutil.KeyStore{NumTypes: 100}
 		ctx = context.Background()
 	)
 
