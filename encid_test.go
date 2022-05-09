@@ -14,7 +14,7 @@ import (
 func TestEncodeDecode(t *testing.T) {
 	var (
 		ctx = context.Background()
-		ks  = &testutil.KeyStore{NumTypes: 100}
+		ks  = testutil.KeyStore{NumTypes: 100}
 	)
 	err := quick.Check(func(n int64) bool {
 		if n <= 0 {
@@ -60,7 +60,7 @@ func TestEncode(t *testing.T) {
 	}
 
 	var (
-		ks        = &testutil.KeyStore{NumTypes: 100}
+		ks        = testutil.KeyStore{NumTypes: 100}
 		zeroBytes zeroByteSource
 		ctx       = context.Background()
 	)
@@ -104,7 +104,7 @@ func TestDecode(t *testing.T) {
 	}
 
 	var (
-		ks  = &testutil.KeyStore{NumTypes: 100}
+		ks  = testutil.KeyStore{NumTypes: 100}
 		ctx = context.Background()
 	)
 
