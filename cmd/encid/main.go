@@ -40,7 +40,7 @@ func run() error {
 
 	ctx := context.Background()
 
-	ks, err := sqlite.New(ksfile, aes.NewCipher)
+	ks, err := sqlite.New(ctx, ksfile, aes.NewCipher)
 	if err != nil {
 		return errors.Wrapf(err, "opening %s", ksfile)
 	}

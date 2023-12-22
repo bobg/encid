@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"embed"
+	"io/fs"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
@@ -19,17 +20,22 @@ var migrations embed.FS
 
 // New creates a new SQLite-backed keystore using the given file.
 // The newcipher function takes a key and returns a cipher for encrypting and decrypting.
-func New(filename string, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
+func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, errors.Wrapf(err, "opening %s", filename)
 	}
 
-	goose.SetBaseFS(migrations)
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		return nil, errors.Wrap(err, "setting goose dialect")
+	mfs, err := fs.Sub(migrations, "migrations")
+	if err != nil {
+		return nil, errors.Wrap(err, "getting migrations")
 	}
-	if err := goose.Up(db, "migrations"); err != nil {
+
+	provider, err := goose.NewProvider(goose.DialectSQLite3, db, mfs, goose.WithVerbose(false))
+	if err != nil {
+		return nil, errors.Wrap(err, "creating goose provider")
+	}
+	if _, err := provider.Up(ctx); err != nil {
 		return nil, errors.Wrap(err, "running migrations")
 	}
 
