@@ -1,6 +1,6 @@
 module github.com/bobg/encid
 
-go 1.16
+go 1.19
 
 require (
 	github.com/bobg/basexx v1.0.0
