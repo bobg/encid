@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/aes"
-	"database/sql"
 	"flag"
 	"fmt"
 	"log"
@@ -88,7 +87,7 @@ func (c maincmd) tryEnc(ctx context.Context, fifty bool, typ int, n int64, isRet
 	} else {
 		id, str, err = encid.Encode(ctx, c.ks, typ, n)
 	}
-	if errors.Is(err, sql.ErrNoRows) && !isRetry {
+	if errors.Is(err, encid.ErrNotFound) && !isRetry {
 		if _, err = c.newKeyHelper(ctx, typ); err != nil {
 			return errors.Wrap(err, "creating new key")
 		}

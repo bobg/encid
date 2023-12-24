@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
-	"database/sql"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/bobg/encid"
 	"github.com/bobg/encid/testutil"
 )
 
@@ -31,13 +31,13 @@ func TestKeyStore(t *testing.T) {
 	}
 
 	_, _, err = ks.DecoderByID(ctx, 1)
-	if !errors.Is(err, sql.ErrNoRows) {
-		t.Errorf("got %v, want %v", err, sql.ErrNoRows)
+	if !errors.Is(err, encid.ErrNotFound) {
+		t.Errorf("got %v, want %v", err, encid.ErrNotFound)
 	}
 
 	_, _, err = ks.EncoderByType(ctx, 1)
-	if !errors.Is(err, sql.ErrNoRows) {
-		t.Errorf("got %v, want %v", err, sql.ErrNoRows)
+	if !errors.Is(err, encid.ErrNotFound) {
+		t.Errorf("got %v, want %v", err, encid.ErrNotFound)
 	}
 
 	id, err := ks.NewKey(ctx, 1, aes.BlockSize)
