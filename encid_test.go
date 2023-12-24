@@ -1,46 +1,18 @@
-package encid
+package encid_test
 
 import (
 	"context"
 	"fmt"
 	"testing"
-	"testing/quick"
 
 	"github.com/bobg/basexx"
 
+	"github.com/bobg/encid"
 	"github.com/bobg/encid/testutil"
 )
 
 func TestEncodeDecode(t *testing.T) {
-	var (
-		ctx = context.Background()
-		ks  = testutil.KeyStore{NumTypes: 100}
-	)
-	err := quick.Check(func(n int64) bool {
-		if n <= 0 {
-			return true
-		}
-		for typ := 1; typ < 100; typ++ {
-			keyID, str, err := Encode(ctx, ks, typ, n)
-			if err != nil {
-				t.Logf("Error encoding (%d, %d): %s", typ, n, err)
-				return false
-			}
-			gotTyp, gotN, err := Decode(ctx, ks, keyID, str)
-			if err != nil {
-				t.Logf("Error decoding (%d, %s): %s\n", keyID, str, err)
-				return false
-			}
-			if gotTyp != typ || gotN != n {
-				t.Logf("Decode(Encode(%d, %d)) = (%d, %d)", typ, n, gotTyp, gotN)
-				return false
-			}
-		}
-		return true
-	}, nil)
-	if err != nil {
-		t.Error(err)
-	}
+	testutil.EncodeDecode(context.Background(), t, testutil.KeyStore{NumTypes: 100}, 100)
 }
 
 func TestEncode(t *testing.T) {
@@ -72,7 +44,7 @@ func TestEncode(t *testing.T) {
 				base = basexx.Base30
 			}
 
-			gotKeyID, gotStr, err := encode(ctx, ks, c.typ, c.n, zeroBytes, base)
+			gotKeyID, gotStr, err := encid.PrivateEncode(ctx, ks, c.typ, c.n, zeroBytes, base)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -115,7 +87,7 @@ func TestDecode(t *testing.T) {
 				base = basexx.Base30
 			}
 
-			gotType, gotN, err := decode(ctx, ks, c.inpKeyID, c.inpStr, base)
+			gotType, gotN, err := encid.PrivateDecode(ctx, ks, c.inpKeyID, c.inpStr, base)
 			if err != nil {
 				t.Fatal(err)
 			}
