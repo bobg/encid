@@ -58,7 +58,11 @@ func (ks *KeyStore) DecoderByID(ctx context.Context, id int64) (typ int, dec fun
 
 	var k []byte
 
-	if err := ks.db.QueryRowContext(ctx, q, id).Scan(&typ, &k); err != nil {
+	err = ks.db.QueryRowContext(ctx, q, id).Scan(&typ, &k)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil, encid.ErrNotFound
+	}
+	if err != nil {
 		return 0, nil, errors.Wrapf(err, "retrieving key %d", id)
 	}
 
@@ -75,7 +79,11 @@ func (ks *KeyStore) EncoderByType(ctx context.Context, typ int) (id int64, enc f
 
 	var k []byte
 
-	if err := ks.db.QueryRowContext(ctx, q, typ).Scan(&id, &k); err != nil {
+	err = ks.db.QueryRowContext(ctx, q, typ).Scan(&id, &k)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil, encid.ErrNotFound
+	}
+	if err != nil {
 		return 0, nil, errors.Wrapf(err, "retrieving key for type %d", typ)
 	}
 
