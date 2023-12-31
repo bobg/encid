@@ -1,9 +1,9 @@
 module github.com/bobg/encid
 
-go 1.19
+go 1.20
 
 require (
-	github.com/bobg/basexx v1.0.0
+	github.com/bobg/basexx/v2 v2.0.1
 	github.com/bobg/subcmd/v2 v2.2.2
 	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/pkg/errors v0.9.1
@@ -11,7 +11,9 @@ require (
 )
 
 require (
+	github.com/bobg/go-generics/v2 v2.2.0 // indirect
 	github.com/sethvargo/go-retry v0.2.4 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df // indirect
 	golang.org/x/sync v0.5.0 // indirect
 )
