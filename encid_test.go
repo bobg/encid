@@ -2,10 +2,11 @@ package encid_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
-	"github.com/bobg/basexx"
+	"github.com/bobg/basexx/v2"
 
 	"github.com/bobg/encid"
 	"github.com/bobg/encid/testutil"
@@ -108,4 +109,32 @@ func (z zeroByteSource) Read(buf []byte) (int, error) {
 		buf[i] = 0
 	}
 	return len(buf), nil
+}
+
+func TestErrs(t *testing.T) {
+	var (
+		ctx = context.Background()
+		ks  = testutil.KeyStore{NumTypes: 1}
+	)
+
+	t.Run("Encode50", func(t *testing.T) {
+		_, _, err := encid.Encode50(ctx, ks, 1000000, 1)
+		if !errors.Is(err, encid.ErrNotFound) {
+			t.Errorf("got error %v, want %v", err, encid.ErrNotFound)
+		}
+	})
+
+	t.Run("Decode50", func(t *testing.T) {
+		_, _, err := encid.Decode50(ctx, ks, 1000000, "1zQqKSwhbq2jGRmBNjZctj1")
+		if !errors.Is(err, encid.ErrNotFound) {
+			t.Errorf("got error %v, want %v", err, encid.ErrNotFound)
+		}
+	})
+
+	t.Run("BadBase50", func(t *testing.T) {
+		_, _, err := encid.Decode50(ctx, ks, 1, "aeiou")
+		if !errors.Is(err, basexx.ErrInvalid) {
+			t.Errorf("got error %v, want %v", err, basexx.ErrInvalid)
+		}
+	})
 }

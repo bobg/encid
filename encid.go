@@ -5,10 +5,11 @@ import (
 	"crypto/aes"
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"strings"
 
-	"github.com/bobg/basexx"
+	"github.com/bobg/basexx/v2"
 	"github.com/pkg/errors"
 )
 
@@ -69,17 +70,12 @@ func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Rea
 
 	enc(buf[:], buf[:])
 
-	var (
-		src     = basexx.NewBuffer(buf[:], basexx.Binary)
-		destbuf = make([]byte, basexx.Length(256, base.N(), aes.BlockSize))
-		dest    = basexx.NewBuffer(destbuf, base)
-	)
-	_, err = basexx.Convert(dest, src)
+	result, err := basexx.Convert(string(buf[:]), basexx.Binary, base)
 	if err != nil {
 		return 0, "", errors.Wrapf(err, "converting %x to base%d", buf[:], base.N())
 	}
 
-	return keyID, string(dest.Written()), nil
+	return keyID, result, nil
 }
 
 // Decode decodes a keyID/string pair produced by Encode.
@@ -103,18 +99,19 @@ func decode(ctx context.Context, ks KeyStore, keyID int64, inp string, base base
 		return 0, 0, errors.Wrapf(err, "getting key with ID %d", keyID)
 	}
 
-	var (
-		src     = basexx.NewBuffer([]byte(inp), base)
-		destbuf [aes.BlockSize]byte
-		dest    = basexx.NewBuffer(destbuf[:], basexx.Binary)
-	)
-	_, err = basexx.Convert(dest, src)
+	bin, err := basexx.Convert(inp, base, basexx.Binary)
 	if err != nil {
 		return 0, 0, errors.Wrapf(err, "converting %s from base%d", inp, base.N())
 	}
 
-	dec(destbuf[:], destbuf[:])
+	if len(bin) > aes.BlockSize {
+		return 0, 0, fmt.Errorf("input string too long (%d bytes)", len(bin))
+	}
 
-	n, _ := binary.Varint(destbuf[:])
+	var decryptBuf [aes.BlockSize]byte
+	copy(decryptBuf[aes.BlockSize-len(bin):], bin)
+	dec(decryptBuf[:], decryptBuf[:])
+
+	n, _ := binary.Varint(decryptBuf[:])
 	return typ, n, nil
 }

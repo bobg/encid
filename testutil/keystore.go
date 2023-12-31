@@ -5,6 +5,8 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/binary"
+
+	"github.com/bobg/encid"
 )
 
 type KeyStore struct {
@@ -12,6 +14,10 @@ type KeyStore struct {
 }
 
 func (tks KeyStore) cipherByID(keyID int64) (cipher.Block, error) {
+	if keyID > 999999 {
+		return nil, encid.ErrNotFound
+	}
+
 	var buf [16]byte
 	binary.BigEndian.PutUint32(buf[:], uint32(keyID))
 	return aes.NewCipher(buf[:])
