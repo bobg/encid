@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"crypto/aes"
-	"crypto/cipher"
 	"errors"
 	"os"
 	"path/filepath"
@@ -23,9 +22,7 @@ func TestKeyStore(t *testing.T) {
 	ctx := context.Background()
 
 	filename := filepath.Join(tmpdir, "keystore.db")
-	ks, err := New(ctx, filename, func(key []byte) (cipher.Block, error) {
-		return aes.NewCipher(key)
-	})
+	ks, err := New(ctx, filename, aes.NewCipher)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,4 +64,41 @@ func TestKeyStore(t *testing.T) {
 	}
 
 	testutil.EncodeDecode(ctx, t, ks, 2)
+}
+
+func TestErrs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("NoDir", func(t *testing.T) {
+		_, err := New(ctx, "this/directory/does/not/exist/foo.db", aes.NewCipher)
+		if err == nil {
+			t.Error("got nil, want error")
+		}
+	})
+
+	tmpdir, err := os.MkdirTemp("", "keystore_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	filename := filepath.Join(tmpdir, "keystore.db")
+	ks, err := New(ctx, filename, aes.NewCipher)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("NoType", func(t *testing.T) {
+		_, _, err := ks.EncoderByType(ctx, 1)
+		if !errors.Is(err, encid.ErrNotFound) {
+			t.Errorf("got %v, want %v", err, encid.ErrNotFound)
+		}
+	})
+
+	t.Run("NoID", func(t *testing.T) {
+		_, _, err := ks.DecoderByID(ctx, 1)
+		if !errors.Is(err, encid.ErrNotFound) {
+			t.Errorf("got %v, want %v", err, encid.ErrNotFound)
+		}
+	})
 }
