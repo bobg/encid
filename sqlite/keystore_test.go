@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"crypto/aes"
+	"crypto/cipher"
 	"errors"
 	"os"
 	"path/filepath"
@@ -99,6 +100,23 @@ func TestErrs(t *testing.T) {
 		_, _, err := ks.DecoderByID(ctx, 1)
 		if !errors.Is(err, encid.ErrNotFound) {
 			t.Errorf("got %v, want %v", err, encid.ErrNotFound)
+		}
+	})
+
+	t.Run("BadCipher", func(t *testing.T) {
+		ks, err := New(ctx, filename, func([]byte) (cipher.Block, error) {
+			return nil, errors.New("bad cipher")
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		keyID, err := ks.NewKey(ctx, 1, aes.BlockSize)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _, err = ks.DecoderByID(ctx, keyID)
+		if err == nil {
+			t.Error("got nil, want error")
 		}
 	})
 }
