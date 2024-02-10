@@ -1,4 +1,4 @@
-module github.com/bobg/encid/v2
+module github.com/bobg/encid
 
 go 1.21
 

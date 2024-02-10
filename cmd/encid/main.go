@@ -12,8 +12,8 @@ import (
 	"github.com/bobg/errors"
 	"github.com/bobg/subcmd/v2"
 
-	"github.com/bobg/encid/v2"
-	"github.com/bobg/encid/v2/sqlite"
+	"github.com/bobg/encid"
+	"github.com/bobg/encid/sqlite"
 )
 
 func main() {

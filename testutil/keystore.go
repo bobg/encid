@@ -6,11 +6,11 @@ import (
 	"crypto/cipher"
 	"encoding/binary"
 
-	"github.com/bobg/encid/v2"
+	"github.com/bobg/encid"
 )
 
 type KeyStore struct {
-	NumTypes int
+	NumTypes, Ver int
 }
 
 func (tks KeyStore) cipherByID(keyID int64) (cipher.Block, error) {
@@ -42,4 +42,8 @@ func (tks KeyStore) EncoderByType(ctx context.Context, typ int) (int64, func(dst
 		return 0, nil, err
 	}
 	return id, ciph.Encrypt, err
+}
+
+func (tks KeyStore) Version() int {
+	return tks.Ver
 }
