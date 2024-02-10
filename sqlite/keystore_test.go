@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/bobg/encid"
-	"github.com/bobg/encid/testutil"
+	"github.com/bobg/encid/v2"
+	"github.com/bobg/encid/v2/testutil"
 )
 
 func TestKeyStore(t *testing.T) {

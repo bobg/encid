@@ -6,7 +6,7 @@ import (
 	"crypto/cipher"
 	"encoding/binary"
 
-	"github.com/bobg/encid"
+	"github.com/bobg/encid/v2"
 )
 
 type KeyStore struct {

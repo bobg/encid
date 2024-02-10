@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/bobg/basexx/v2"
-	"github.com/pkg/errors"
+	"github.com/bobg/errors"
 )
 
 // KeyStore is an object that stores encryption keys.

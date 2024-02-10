@@ -8,11 +8,11 @@ import (
 	"embed"
 	"io/fs"
 
+	"github.com/bobg/errors"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/pkg/errors"
 	"github.com/pressly/goose/v3"
 
-	"github.com/bobg/encid"
+	"github.com/bobg/encid/v2"
 )
 
 //go:embed migrations/*.sql

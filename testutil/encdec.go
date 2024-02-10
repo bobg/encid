@@ -5,7 +5,7 @@ import (
 	"testing"
 	"testing/quick"
 
-	"github.com/bobg/encid"
+	"github.com/bobg/encid/v2"
 )
 
 func EncodeDecode(ctx context.Context, t *testing.T, ks encid.KeyStore, numTypes int) {
