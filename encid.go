@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"strings"
 
@@ -37,8 +38,13 @@ type KeyStore interface {
 	EncoderByType(context.Context, int) (int64, func(dst, src []byte), error)
 }
 
-// ErrNotFound is the type of error produced when KeyStore methods find no key.
-var ErrNotFound = errors.New("not found")
+var (
+	// ErrNotFound is the type of error produced when KeyStore methods find no key.
+	ErrNotFound = errors.New("not found")
+
+	// ErrChecksum is the type of error produced when a checksum fails during decoding.
+	ErrChecksum = errors.New("checksum failed")
+)
 
 // Encode encodes a number n using a key of the given type from the given keystore.
 // The result is the ID of the key used, followed by the encrypted string.
@@ -63,10 +69,19 @@ func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Rea
 
 	var buf [aes.BlockSize]byte
 	nbytes := binary.PutVarint(buf[:], n)
-	_, err = io.ReadFull(randBytes, buf[nbytes:])
+
+	// Nbytes is between 1 and 10, inclusive,
+	// and aes.BlockSize is 16.
+	// Let's put a 32-bit checksum in the last four bytes,
+	// and fill the stuff in between with randomness.
+
+	_, err = io.ReadFull(randBytes, buf[nbytes:len(buf)-4])
 	if err != nil {
 		return 0, "", errors.Wrap(err, "padding cipher block with random bytes")
 	}
+
+	checksum := crc32.ChecksumIEEE(buf[:len(buf)-4])
+	binary.BigEndian.PutUint32(buf[len(buf)-4:], checksum)
 
 	enc(buf[:], buf[:])
 
@@ -111,6 +126,12 @@ func decode(ctx context.Context, ks KeyStore, keyID int64, inp string, base base
 	var decryptBuf [aes.BlockSize]byte
 	copy(decryptBuf[aes.BlockSize-len(bin):], bin)
 	dec(decryptBuf[:], decryptBuf[:])
+
+	receivedChecksum := binary.BigEndian.Uint32(decryptBuf[len(decryptBuf)-4:])
+	computedChecksum := crc32.ChecksumIEEE(decryptBuf[:len(decryptBuf)-4])
+	if computedChecksum != receivedChecksum {
+		return 0, 0, ErrChecksum
+	}
 
 	n, _ := binary.Varint(decryptBuf[:])
 	return typ, n, nil
