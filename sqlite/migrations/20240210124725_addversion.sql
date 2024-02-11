@@ -14,4 +14,6 @@ INSERT OR IGNORE INTO version (singleton, version) VALUES (0, 1);
 -- +goose Down
 -- +goose StatementBegin
 SELECT 'down SQL query';
+
+DROP TABLE IF EXISTS version;
 -- +goose StatementEnd
