@@ -94,8 +94,9 @@ func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Rea
 
 	// Nbytes is between 1 and 10, inclusive,
 	// and aes.BlockSize is 16.
-	// Let's put a 32-bit checksum in the last four bytes,
-	// and fill the stuff in between with randomness.
+	// For version 2 keystores and later,
+	// let's put a 32-bit checksum in the last four bytes.
+	// The rest gets filled with randomness.
 
 	versioner, isV2 := ks.(Versioner)
 	isV2 = isV2 && versioner.Version() >= 2
@@ -168,6 +169,9 @@ func decode(ctx context.Context, ks KeyStore, keyID int64, inp string, base base
 	dec(decryptBuf[:], decryptBuf[:])
 
 	if v, ok := ks.(Versioner); ok && v.Version() >= 2 {
+		// For version 2 keystores and later,
+		// the last four bytes are a checksum that we must verify.
+
 		var (
 			received = binary.BigEndian.Uint32(decryptBuf[len(decryptBuf)-4:])
 			computed = crc32.ChecksumIEEE(decryptBuf[:len(decryptBuf)-4])
