@@ -44,10 +44,16 @@ type KeyStore interface {
 }
 
 // Versioner is an optional interface that KeyStores should implement.
-// It reports the version of the KeyStore's API.
+// It reports the version of the encoding to use when using a KeyStore.
+// When the KeyStore is a Versioner reporting version 2 or later,
+// [Encode] and [Encode50] produce encoded ids that include a checksum
+// and [Decode] and [Decode50] verify that checksum.
+// See https://github.com/bobg/encid/issues/5.
+//
 // If a KeyStore does not implement Versioner, it is assumed to be at version 1.
-// Encoded ids created with KeyStores at version 2 or later include a checksum
-// and are not compatible with version 1 ids.
+//
+// Version 2 encoded IDs are not compatible with version 1 IDs;
+// you can't decode a v2 ID using a v1 KeyStore and vice versa.
 type Versioner interface {
 	Version() int
 }
