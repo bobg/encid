@@ -35,7 +35,7 @@ func (tks KeyStore) DecoderByID(_ context.Context, keyID int64) (int, func(dst, 
 	return int(keyID) % n, ciph.Decrypt, err
 }
 
-func (tks KeyStore) EncoderByType(ctx context.Context, typ int) (int64, func(dst, src []byte), error) {
+func (tks KeyStore) EncoderByType(_ context.Context, typ int) (int64, func(dst, src []byte), error) {
 	id := int64(typ)
 	ciph, err := tks.cipherByID(id)
 	if err != nil {

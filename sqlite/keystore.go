@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"embed"
 	"io/fs"
-	"os"
 
 	"github.com/bobg/errors"
 	_ "github.com/mattn/go-sqlite3"
@@ -20,15 +19,15 @@ import (
 var migrations embed.FS
 
 // New creates a new SQLite-backed keystore using the given file.
-// If the file does not exist, it is created and the version number of the keystore is set to 2.
 // The newcipher function takes a key and returns a cipher for encrypting and decrypting.
+//
+// If the keystore is new (i.e., contains no keys),
+// the version number of the keystore is set to 2.
+// If the keystore is non-empty and was created before v1.5.0 of this module,
+// its version will be 1.
+// The version number controls whether the resulting encoded ids include a checksum.
+// Version 1 ids are not compatible with version 2 ids.
 func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
-	_, err := os.Stat(filename)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, errors.Wrapf(err, "checking for %s", filename)
-	}
-	existed := err == nil
-
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, errors.Wrapf(err, "opening %s", filename)
@@ -47,10 +46,13 @@ func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Bl
 		return nil, errors.Wrap(err, "running migrations")
 	}
 
-	if !existed {
+	var nkeys int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM keys`).Scan(&nkeys); err != nil {
+		return nil, errors.Wrap(err, "counting keys")
+	}
+	if nkeys == 0 {
 		const q = `UPDATE version SET version = 2 WHERE singleton = 0 AND version < 2`
-		_, err := db.ExecContext(ctx, q)
-		if err != nil {
+		if _, err := db.ExecContext(ctx, q); err != nil {
 			return nil, errors.Wrap(err, "updating version")
 		}
 	}
@@ -75,7 +77,10 @@ type KeyStore struct {
 	version   int
 }
 
-var _ encid.KeyStore = &KeyStore{}
+var (
+	_ encid.KeyStore  = &KeyStore{}
+	_ encid.Versioner = &KeyStore{}
+)
 
 func (ks *KeyStore) DecoderByID(ctx context.Context, id int64) (typ int, dec func(dst, src []byte), err error) {
 	const q = `SELECT typ, k FROM keys WHERE id = $1`

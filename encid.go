@@ -20,6 +20,11 @@ import (
 // These keys can be used to encrypt other int64s,
 // and to decrypt the resulting strings.
 // See Encode and Decode.
+//
+// If you're implementing a KeyStore,
+// you should also implement the [Versioner] interface,
+// and return a value of 2 or greater from the Version method.
+// A KeyStore that isn't also a Versioner is assumed to be at version 1.
 type KeyStore interface {
 	// DecoderByID looks up a key in the store by its ID.
 	// It returns the key's type and a function for decrypting a data block using the key.
@@ -38,7 +43,11 @@ type KeyStore interface {
 	EncoderByType(context.Context, int) (int64, func(dst, src []byte), error)
 }
 
-// Versioner reports the version of an object.
+// Versioner is an optional interface that KeyStores should implement.
+// It reports the version of the KeyStore's API.
+// If a KeyStore does not implement Versioner, it is assumed to be at version 1.
+// Encoded ids created with KeyStores at version 2 or later include a checksum
+// and are not compatible with version 1 ids.
 type Versioner interface {
 	Version() int
 }
