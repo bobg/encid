@@ -2,8 +2,6 @@ module github.com/bobg/encid
 
 go 1.21
 
-toolchain go1.22.0
-
 require (
 	github.com/bobg/basexx/v2 v2.0.1
 	github.com/bobg/errors v1.0.0
