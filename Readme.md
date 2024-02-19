@@ -4,6 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/bobg/encid)](https://goreportcard.com/report/github.com/bobg/encid)
 [![Tests](https://github.com/bobg/encid/actions/workflows/go.yml/badge.svg)](https://github.com/bobg/encid/actions/workflows/go.yml)
 [![Coverage Status](https://coveralls.io/repos/github/bobg/encid/badge.svg?branch=master)](https://coveralls.io/github/bobg/encid?branch=master)
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)
 
 This is encid,
 a program and library for working with encrypted integer IDs.
