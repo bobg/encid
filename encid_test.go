@@ -31,12 +31,12 @@ func TestEncode(t *testing.T) {
 		{typ: 1, n: 1, wantKeyID: 1, version: 1, wantStr: "1zQqKSwhbq2jGRmBNjZctj1", base: basexx.Base50},
 		{typ: 1, n: 2, wantKeyID: 1, version: 1, wantStr: "d4VG7SKjtxtGsSbxzvpCBfw", base: basexx.Base50},
 		{typ: 2, n: 1, wantKeyID: 2, version: 1, wantStr: "fCfbrS0rNNgvsp9gXQ7c2p9", base: basexx.Base50},
-		{typ: 1, n: 1, wantKeyID: 1, version: 2, wantStr: "187m1w1gp1xtgdyy7dq7mgr1b2h"},
-		{typ: 1, n: 2, wantKeyID: 1, version: 2, wantStr: "8kqn7d1310h3knzvsyfy427phk"},
-		{typ: 2, n: 1, wantKeyID: 2, version: 2, wantStr: "d62j793gvgvnwk4t86w8k80m6t"},
-		{typ: 1, n: 1, wantKeyID: 1, version: 2, wantStr: "fzJ543mQkM2x68922W7brqv", base: basexx.Base50},
-		{typ: 1, n: 2, wantKeyID: 1, version: 2, wantStr: "32DnqVvT6ptFknXTCPNmbZk", base: basexx.Base50},
-		{typ: 2, n: 1, wantKeyID: 2, version: 2, wantStr: "4jQxPjSWVmmKNbG50fvrMy4", base: basexx.Base50},
+		{typ: 1, n: 1, wantKeyID: 1, version: 2, wantStr: "gpq7h0hkwsdbryrxcytzdc5sfr"},
+		{typ: 1, n: 2, wantKeyID: 1, version: 2, wantStr: "195v07rdbbmhmfdh1nvk5808kxm"},
+		{typ: 2, n: 1, wantKeyID: 2, version: 2, wantStr: "10z1f7rhb9ztx1pwz41wb76rzzy"},
+		{typ: 1, n: 1, wantKeyID: 1, version: 2, wantStr: "5c1wgMxM5PxHSDnWSRnsjrd", base: basexx.Base50},
+		{typ: 1, n: 2, wantKeyID: 1, version: 2, wantStr: "fWr8MP0D3BswmFbH9GpK2Ry", base: basexx.Base50},
+		{typ: 2, n: 1, wantKeyID: 2, version: 2, wantStr: "c0fDv9Zzt2qdRnxTxXnGDnY", base: basexx.Base50},
 	}
 
 	var (
@@ -83,12 +83,12 @@ func TestDecode(t *testing.T) {
 		{inpKeyID: 1, version: 1, inpStr: "1zQqKSwhbq2jGRmBNjZctj1", wantType: 1, wantN: 1, base: basexx.Base50},
 		{inpKeyID: 1, version: 1, inpStr: "d4VG7SKjtxtGsSbxzvpCBfw", wantType: 1, wantN: 2, base: basexx.Base50},
 		{inpKeyID: 2, version: 1, inpStr: "fCfbrS0rNNgvsp9gXQ7c2p9", wantType: 2, wantN: 1, base: basexx.Base50},
-		{inpKeyID: 1, version: 2, inpStr: "187m1w1gp1xtgdyy7dq7mgr1b2h", wantType: 1, wantN: 1},
-		{inpKeyID: 1, version: 2, inpStr: "8kqn7d1310h3knzvsyfy427phk", wantType: 1, wantN: 2},
-		{inpKeyID: 2, version: 2, inpStr: "d62j793gvgvnwk4t86w8k80m6t", wantType: 2, wantN: 1},
-		{inpKeyID: 1, version: 2, inpStr: "fzJ543mQkM2x68922W7brqv", wantType: 1, wantN: 1, base: basexx.Base50},
-		{inpKeyID: 1, version: 2, inpStr: "32DnqVvT6ptFknXTCPNmbZk", wantType: 1, wantN: 2, base: basexx.Base50},
-		{inpKeyID: 2, version: 2, inpStr: "4jQxPjSWVmmKNbG50fvrMy4", wantType: 2, wantN: 1, base: basexx.Base50},
+		{inpKeyID: 1, version: 2, inpStr: "gpq7h0hkwsdbryrxcytzdc5sfr", wantType: 1, wantN: 1},
+		{inpKeyID: 1, version: 2, inpStr: "195v07rdbbmhmfdh1nvk5808kxm", wantType: 1, wantN: 2},
+		{inpKeyID: 2, version: 2, inpStr: "10z1f7rhb9ztx1pwz41wb76rzzy", wantType: 2, wantN: 1},
+		{inpKeyID: 1, version: 2, inpStr: "5c1wgMxM5PxHSDnWSRnsjrd", wantType: 1, wantN: 1, base: basexx.Base50},
+		{inpKeyID: 1, version: 2, inpStr: "fWr8MP0D3BswmFbH9GpK2Ry", wantType: 1, wantN: 2, base: basexx.Base50},
+		{inpKeyID: 2, version: 2, inpStr: "c0fDv9Zzt2qdRnxTxXnGDnY", wantType: 2, wantN: 1, base: basexx.Base50},
 	}
 
 	ctx := context.Background()

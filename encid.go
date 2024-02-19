@@ -1,12 +1,12 @@
 package encid
 
 import (
+	"bytes"
 	"context"
 	"crypto/aes"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"hash/crc32"
 	"io"
 	"strings"
 
@@ -45,9 +45,9 @@ type KeyStore interface {
 
 // Versioner is an optional interface that KeyStores should implement.
 // It reports the version of the encoding to use when using a KeyStore.
+//
 // When the KeyStore is a Versioner reporting version 2 or later,
-// [Encode] and [Encode50] produce encoded ids that include a checksum
-// and [Decode] and [Decode50] verify that checksum.
+// a different encoding is used to make the results more secure.
 // See https://github.com/bobg/encid/issues/5.
 //
 // If a KeyStore does not implement Versioner, it is assumed to be at version 1.
@@ -58,13 +58,8 @@ type Versioner interface {
 	Version() int
 }
 
-var (
-	// ErrNotFound is the type of error produced when KeyStore methods find no key.
-	ErrNotFound = errors.New("not found")
-
-	// ErrChecksum is the type of error produced when a checksum fails during decoding.
-	ErrChecksum = errors.New("checksum failed")
-)
+// ErrNotFound is the type of error produced when KeyStore methods find no key.
+var ErrNotFound = errors.New("not found")
 
 // Encode encodes a number n using a key of the given type from the given keystore.
 // The result is the ID of the key used, followed by the encrypted string.
@@ -73,7 +68,8 @@ var (
 // It excludes vowels (to avoid inadvertently spelling naughty words) and lowercase "L".
 //
 // If the keystore is also a [Versioner] that reports a version of 2 or greater,
-// the resulting string will include a checksum that is checked at decoding time.
+// the resulting string will use a different encoding than in earlier versions
+// and can be decoded only with a keystore that also reports a version of 2 or greater.
 // See https://github.com/bobg/encid/issues/5.
 func Encode(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string, error) {
 	return encode(ctx, ks, typ, n, rand.Reader, basexx.Base30)
@@ -83,7 +79,8 @@ func Encode(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string, 
 // which uses digits 0-9, then lower-case bcdfghjkmnpqrstvwxyz, then upper-case BCDFGHJKMNPQRSTVWXYZ.
 //
 // If the keystore is also a [Versioner] that reports a version of 2 or greater,
-// the resulting string will include a checksum that is checked at decoding time.
+// the resulting string will use a different encoding than in earlier versions
+// and can be decoded only with a keystore that also reports a version of 2 or greater.
 // See https://github.com/bobg/encid/issues/5.
 func Encode50(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string, error) {
 	return encode(ctx, ks, typ, n, rand.Reader, basexx.Base50)
@@ -96,30 +93,19 @@ func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Rea
 	}
 
 	var buf [aes.BlockSize]byte
-	nbytes := binary.PutVarint(buf[:], n)
-
-	// Nbytes is between 1 and 10, inclusive,
-	// and aes.BlockSize is 16.
-	// For version 2 keystores and later,
-	// let's put a 32-bit checksum in the last four bytes.
-	// The rest gets filled with randomness.
 
 	versioner, isV2 := ks.(Versioner)
 	isV2 = isV2 && versioner.Version() >= 2
 
-	randbuf := buf[nbytes:]
 	if isV2 {
-		randbuf = buf[nbytes : len(buf)-4]
-	}
-
-	_, err = io.ReadFull(randBytes, randbuf)
-	if err != nil {
-		return 0, "", errors.Wrap(err, "padding cipher block with random bytes")
-	}
-
-	if isV2 {
-		checksum := crc32.ChecksumIEEE(buf[:len(buf)-4])
-		binary.LittleEndian.PutUint32(buf[len(buf)-4:], checksum)
+		buf[0] = 2 // Version byte.
+		binary.LittleEndian.PutUint64(buf[1:], uint64(n))
+	} else {
+		nbytes := binary.PutVarint(buf[:], n)
+		_, err = io.ReadFull(randBytes, buf[nbytes:])
+		if err != nil {
+			return 0, "", errors.Wrap(err, "padding cipher block with random bytes")
+		}
 	}
 
 	enc(buf[:], buf[:])
@@ -137,7 +123,8 @@ func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Rea
 // As a convenience, it maps the input string to all lowercase before decoding.
 //
 // If the keystore is also a [Versioner] that reports a version of 2 or greater,
-// the input string must include a checksum and may result an ErrChecksum error in case of a mismatch.
+// the input string must use version-2 encoding
+// (i.e., it must have been produced with a keystore that also reports a version of 2 or greater).
 // See https://github.com/bobg/encid/issues/5.
 func Decode(ctx context.Context, ks KeyStore, keyID int64, inp string) (int, int64, error) {
 	return decode(ctx, ks, keyID, strings.ToLower(inp), basexx.Base30)
@@ -176,15 +163,22 @@ func decode(ctx context.Context, ks KeyStore, keyID int64, inp string, base base
 
 	if v, ok := ks.(Versioner); ok && v.Version() >= 2 {
 		// For version 2 keystores and later,
-		// the last four bytes are a checksum that we must verify.
+		// check the version byte,
+		// and that the buffer is zero-padded.
+		// See https://github.com/bobg/encid/issues/5.
 
-		var (
-			received = binary.LittleEndian.Uint32(decryptBuf[len(decryptBuf)-4:])
-			computed = crc32.ChecksumIEEE(decryptBuf[:len(decryptBuf)-4])
-		)
-		if computed != received {
-			return 0, 0, ErrChecksum
+		if decryptBuf[0] != 2 {
+			return 0, 0, fmt.Errorf("unexpected version byte %d", decryptBuf[0])
 		}
+
+		var zeroes [aes.BlockSize - 9]byte
+		if !bytes.Equal(decryptBuf[9:], zeroes[:]) {
+			return 0, 0, fmt.Errorf("zero-padding check failed")
+		}
+
+		n := int64(binary.LittleEndian.Uint64(decryptBuf[1:]))
+
+		return typ, n, nil
 	}
 
 	n, x := binary.Varint(decryptBuf[:])
