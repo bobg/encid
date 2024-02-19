@@ -119,7 +119,7 @@ func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Rea
 
 	if isV2 {
 		checksum := crc32.ChecksumIEEE(buf[:len(buf)-4])
-		binary.BigEndian.PutUint32(buf[len(buf)-4:], checksum)
+		binary.LittleEndian.PutUint32(buf[len(buf)-4:], checksum)
 	}
 
 	enc(buf[:], buf[:])
@@ -179,7 +179,7 @@ func decode(ctx context.Context, ks KeyStore, keyID int64, inp string, base base
 		// the last four bytes are a checksum that we must verify.
 
 		var (
-			received = binary.BigEndian.Uint32(decryptBuf[len(decryptBuf)-4:])
+			received = binary.LittleEndian.Uint32(decryptBuf[len(decryptBuf)-4:])
 			computed = crc32.ChecksumIEEE(decryptBuf[:len(decryptBuf)-4])
 		)
 		if computed != received {
@@ -187,6 +187,9 @@ func decode(ctx context.Context, ks KeyStore, keyID int64, inp string, base base
 		}
 	}
 
-	n, _ := binary.Varint(decryptBuf[:])
+	n, x := binary.Varint(decryptBuf[:])
+	if x <= 0 {
+		return 0, 0, fmt.Errorf("decoding error")
+	}
 	return typ, n, nil
 }
