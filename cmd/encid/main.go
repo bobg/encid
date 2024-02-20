@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/bobg/errors"
 	"github.com/bobg/subcmd/v2"
-	"github.com/pkg/errors"
 
 	"github.com/bobg/encid"
 	"github.com/bobg/encid/sqlite"
