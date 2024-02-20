@@ -136,7 +136,8 @@ func Decode(ctx context.Context, ks KeyStore, keyID int64, inp string) (int, int
 // since base50 strings are case-sensitive.
 //
 // If the keystore is also a [Versioner] that reports a version of 2 or greater,
-// the input string must include a checksum and may result an ErrChecksum error in case of a mismatch.
+// the input string must use version-2 encoding
+// (i.e., it must have been produced with a keystore that also reports a version of 2 or greater).
 // See https://github.com/bobg/encid/issues/5.
 func Decode50(ctx context.Context, ks KeyStore, keyID int64, inp string) (int, int64, error) {
 	return decode(ctx, ks, keyID, inp, basexx.Base50)
