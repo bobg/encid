@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"database/sql"
@@ -20,6 +21,7 @@ var migrations embed.FS
 
 // New creates a new SQLite-backed keystore using the given file.
 // The newcipher function takes a key and returns a cipher for encrypting and decrypting.
+// If newcipher is nil, it defaults to [aes.NewCipher].
 //
 // If the keystore is new (i.e., contains no keys),
 // the version number of the keystore is set to 2.
@@ -61,6 +63,10 @@ func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Bl
 	err = db.QueryRowContext(ctx, `SELECT version FROM version WHERE singleton = 0`).Scan(&version)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting version")
+	}
+
+	if newcipher == nil {
+		newcipher = aes.NewCipher
 	}
 
 	return &KeyStore{
