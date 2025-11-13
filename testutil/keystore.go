@@ -6,7 +6,7 @@ import (
 	"crypto/cipher"
 	"encoding/binary"
 
-	"github.com/bobg/encid"
+	"github.com/bobg/encid/v2"
 )
 
 type KeyStore struct {
@@ -23,7 +23,7 @@ func (tks KeyStore) cipherByID(keyID int64) (cipher.Block, error) {
 	return aes.NewCipher(buf[:])
 }
 
-func (tks KeyStore) DecoderByID(_ context.Context, keyID int64) (int, func(dst, src []byte), error) {
+func (tks KeyStore) DecoderByID(_ context.Context, keyID int64) (int, encid.Decrypter, error) {
 	n := tks.NumTypes
 	if n < 1 {
 		n = 2
@@ -32,16 +32,16 @@ func (tks KeyStore) DecoderByID(_ context.Context, keyID int64) (int, func(dst, 
 	if err != nil {
 		return 0, nil, err
 	}
-	return int(keyID) % n, ciph.Decrypt, err
+	return int(keyID) % n, ciph, err
 }
 
-func (tks KeyStore) EncoderByType(_ context.Context, typ int) (int64, func(dst, src []byte), error) {
+func (tks KeyStore) EncoderByType(_ context.Context, typ int) (int64, encid.Encrypter, error) {
 	id := int64(typ)
 	ciph, err := tks.cipherByID(id)
 	if err != nil {
 		return 0, nil, err
 	}
-	return id, ciph.Encrypt, err
+	return id, ciph, err
 }
 
 func (tks KeyStore) Version() int {
