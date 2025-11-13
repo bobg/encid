@@ -18,20 +18,24 @@ import (
 // and has an associated "type" (an int) and a unique key ID (an int64).
 // These keys can be used to encrypt other int64s,
 // and to decrypt the resulting strings.
-// See Encode and Decode.
+// See [Encode] and [Decode].
+//
+// The meanings of the "type" values are user-defined.
+// You may choose to give all your keys the same type,
+// or you might prefer to use different types for different resources
+// (e.g. 1 for users, 2 for documents, etc).
 type KeyStore interface {
 	// DecoderByID looks up a key in the store by its ID.
-	// It returns the key's type and a function for decrypting a data block using the key.
-	// The slice arguments to the decryption function must overlap entirely or not at all.
+	// It returns the key's type and a [Decrypter] for decrypting a data block using the key.
 	// If no key with the given ID is found,
 	// ErrNotFound is returned.
 	DecoderByID(context.Context, int64) (int, Decrypter, error)
 
 	// EncoderByType looks up a key in the store by its type.
-	// It returns the key's ID and a function for encrypting a data block using the key.
-	// The slice arguments to the encryption function must overlap entirely or not at all.
+	// It returns the key's ID and an [Encrypter] for encrypting a data block using the key.
 	// In case there are multiple keys of the given type,
 	// it is up to the implementation to choose one and return it.
+	// (For example, it could choose the newest one.)
 	// If no key with the given type is found,
 	// ErrNotFound is returned.
 	EncoderByType(context.Context, int) (int64, Encrypter, error)
