@@ -13,7 +13,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
 
-	"github.com/bobg/encid"
+	"github.com/bobg/encid/v2"
 )
 
 //go:embed migrations/*.sql
@@ -83,12 +83,9 @@ type KeyStore struct {
 	version   int
 }
 
-var (
-	_ encid.KeyStore  = &KeyStore{}
-	_ encid.Versioner = &KeyStore{}
-)
+var _ encid.KeyStore = &KeyStore{}
 
-func (ks *KeyStore) DecoderByID(ctx context.Context, id int64) (typ int, dec func(dst, src []byte), err error) {
+func (ks *KeyStore) DecoderByID(ctx context.Context, id int64) (typ int, dec encid.Decrypter, err error) {
 	const q = `SELECT typ, k FROM keys WHERE id = $1`
 
 	var k []byte
@@ -106,10 +103,10 @@ func (ks *KeyStore) DecoderByID(ctx context.Context, id int64) (typ int, dec fun
 		return 0, nil, errors.Wrapf(err, "creating cipher for key %d", id)
 	}
 
-	return typ, ciph.Decrypt, nil
+	return typ, ciph, nil
 }
 
-func (ks *KeyStore) EncoderByType(ctx context.Context, typ int) (id int64, enc func(dst, src []byte), err error) {
+func (ks *KeyStore) EncoderByType(ctx context.Context, typ int) (id int64, enc encid.Encrypter, err error) {
 	const q = `SELECT id, k FROM keys WHERE typ = $1 ORDER BY id DESC LIMIT 1`
 
 	var k []byte
@@ -127,7 +124,7 @@ func (ks *KeyStore) EncoderByType(ctx context.Context, typ int) (id int64, enc f
 		return 0, nil, errors.Wrapf(err, "creating cipher for key %d", id)
 	}
 
-	return id, ciph.Encrypt, nil
+	return id, ciph, nil
 }
 
 func (ks *KeyStore) Version() int {
