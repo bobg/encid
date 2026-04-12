@@ -119,7 +119,7 @@ func TestDecode(t *testing.T) {
 type zeroByteSource struct{}
 
 func (z zeroByteSource) Read(buf []byte) (int, error) {
-	for i := 0; i < len(buf); i++ {
+	for i := range buf {
 		buf[i] = 0
 	}
 	return len(buf), nil
