@@ -82,10 +82,15 @@ func Encode(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string, 
 	return encode(ctx, ks, typ, n, rand.Reader, basexx.Base30)
 }
 
-// Encode50 is the same as Encode but it expresses the encrypted string in base 50,
+// Encode50 is the same as [Encode] but it expresses the encrypted string in base 50,
 // which uses digits 0-9, then lower-case bcdfghjkmnpqrstvwxyz, then upper-case BCDFGHJKMNPQRSTVWXYZ.
 func Encode50(ctx context.Context, ks KeyStore, typ int, n int64) (int64, string, error) {
 	return encode(ctx, ks, typ, n, rand.Reader, basexx.Base50)
+}
+
+// EncodeXX is the same as [Encode] but permits using any number base.
+func EncodeXX(ctx context.Context, ks KeyStore, typ int, n int64, base basexx.Base) (int64, string, error) {
+	return encode(ctx, ks, typ, n, rand.Reader, base)
 }
 
 func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Reader, base basexx.Base) (int64, string, error) {
@@ -117,19 +122,24 @@ func encode(ctx context.Context, ks KeyStore, typ int, n int64, randBytes io.Rea
 	return keyID, result, nil
 }
 
-// Decode decodes a keyID/string pair produced by Encode.
+// Decode decodes a keyID/string pair produced by [Encode].
 // It produces the type of the key that was used, and the bare int64 value that was encrypted.
 // As a convenience, it maps the input string to all lowercase before decoding.
 func Decode(ctx context.Context, ks KeyStore, keyID int64, inp string) (int, int64, error) {
 	return decode(ctx, ks, keyID, strings.ToLower(inp), basexx.Base30)
 }
 
-// Decode50 decodes a keyID/string pair produced by Encode50.
+// Decode50 decodes a keyID/string pair produced by [Encode50].
 // It produces the type of the key that was used, and the bare int64 value that was encrypted.
-// Unlike Decode, this does not map the input to lowercase first,
+// Unlike [Decode], this does not map the input to lowercase first,
 // since base50 strings are case-sensitive.
 func Decode50(ctx context.Context, ks KeyStore, keyID int64, inp string) (int, int64, error) {
 	return decode(ctx, ks, keyID, inp, basexx.Base50)
+}
+
+// DecodeXX decodes a keyID/string pair produced by [EncodeXX] using the given base.
+func DecodeXX(ctx context.Context, ks KeyStore, keyID int64, inp string, base basexx.Base) (int, int64, error) {
+	return decode(ctx, ks, keyID, inp, base)
 }
 
 func decode(ctx context.Context, ks KeyStore, keyID int64, inp string, base basexx.Base) (int, int64, error) {
