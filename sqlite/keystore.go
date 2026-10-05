@@ -54,7 +54,6 @@ func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Bl
 // Otherwise, closing the database connection is the caller's responsibility
 // and should not be done until after a call to Close.
 func NewFromDB(ctx context.Context, db *sql.DB, own bool, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
-
 	mfs, err := fs.Sub(migrations, "migrations")
 	if err != nil {
 		return nil, errors.Wrap(err, "getting migrations")

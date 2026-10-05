@@ -27,6 +27,7 @@ func TestKeyStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ks.Close()
 
 	_, _, err = ks.DecoderByID(ctx, 1)
 	if !errors.Is(err, encid.ErrNotFound) {
@@ -88,6 +89,7 @@ func TestErrs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ks.Close()
 
 	t.Run("NoType", func(t *testing.T) {
 		_, _, err := ks.EncoderByType(ctx, 1)
@@ -110,6 +112,8 @@ func TestErrs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer ks.Close()
+
 		keyID, err := ks.NewKey(ctx, 1, aes.BlockSize)
 		if err != nil {
 			t.Fatal(err)
