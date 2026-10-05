@@ -4,68 +4,33 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"database/sql"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/bobg/encid/v2"
 	"github.com/bobg/encid/v2/testutil"
 )
 
 func TestKeyStore(t *testing.T) {
-	tmpdir, err := os.MkdirTemp("", "keystore_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpdir)
+	testutil.TestKeyStore(t, func(t *testing.T) testutil.KeyStoreTester {
+		tmpdir, err := os.MkdirTemp("", "keystore_test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.RemoveAll(tmpdir) })
 
-	ctx := context.Background()
+		ctx := context.Background()
+		filename := filepath.Join(tmpdir, "keystore.db")
+		ks, err := New(ctx, filename, aes.NewCipher)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { ks.Close() })
 
-	filename := filepath.Join(tmpdir, "keystore.db")
-	ks, err := New(ctx, filename, aes.NewCipher)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ks.Close()
-
-	_, _, err = ks.DecoderByID(ctx, 1)
-	if !errors.Is(err, encid.ErrNotFound) {
-		t.Errorf("got %v, want %v", err, encid.ErrNotFound)
-	}
-
-	_, _, err = ks.EncoderByType(ctx, 1)
-	if !errors.Is(err, encid.ErrNotFound) {
-		t.Errorf("got %v, want %v", err, encid.ErrNotFound)
-	}
-
-	id, err := ks.NewKey(ctx, 1, aes.BlockSize)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	typ, _, err := ks.DecoderByID(ctx, id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if typ != 1 {
-		t.Errorf("got type %d, want 1", typ)
-	}
-
-	gotID, _, err := ks.EncoderByType(ctx, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if gotID != id {
-		t.Errorf("got ID %d, want %d", gotID, id)
-	}
-
-	_, err = ks.NewKey(ctx, 2, aes.BlockSize)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testutil.EncodeDecode(ctx, t, ks, 2)
+		return ks
+	})
 }
 
 func TestErrs(t *testing.T) {
@@ -91,20 +56,6 @@ func TestErrs(t *testing.T) {
 	}
 	defer ks.Close()
 
-	t.Run("NoType", func(t *testing.T) {
-		_, _, err := ks.EncoderByType(ctx, 1)
-		if !errors.Is(err, encid.ErrNotFound) {
-			t.Errorf("got %v, want %v", err, encid.ErrNotFound)
-		}
-	})
-
-	t.Run("NoID", func(t *testing.T) {
-		_, _, err := ks.DecoderByID(ctx, 1)
-		if !errors.Is(err, encid.ErrNotFound) {
-			t.Errorf("got %v, want %v", err, encid.ErrNotFound)
-		}
-	})
-
 	t.Run("BadCipher", func(t *testing.T) {
 		ks, err := New(ctx, filename, func([]byte) (cipher.Block, error) {
 			return nil, errors.New("bad cipher")
@@ -123,4 +74,33 @@ func TestErrs(t *testing.T) {
 			t.Error("got nil, want error")
 		}
 	})
+}
+
+func TestNewFromDB(t *testing.T) {
+	tmpdir, err := os.MkdirTemp("", "keystore_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	ctx := context.Background()
+
+	filename := filepath.Join(tmpdir, "keystore.db")
+	db, err := sql.Open("sqlite3", filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	ks, err := NewFromDB(ctx, db, false, aes.NewCipher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ks.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.PingContext(ctx); err != nil {
+		t.Errorf("db should still be pingable after closing unowned keystore: %v", err)
+	}
 }

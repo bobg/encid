@@ -13,7 +13,6 @@ import (
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 
-	"github.com/bobg/encid/v2"
 	"github.com/bobg/encid/v2/testutil"
 )
 
@@ -51,71 +50,37 @@ func getFreePort() uint32 {
 	return uint32(l.Addr().(*net.TCPAddr).Port)
 }
 
+func setupTestDB(t *testing.T) *KeyStore {
+	t.Helper()
+
+	ctx := context.Background()
+	db, err := sql.Open("pgx", pgConnStr)
+	if err != nil {
+		t.Fatalf("opening test db: %v", err)
+	}
+	defer db.Close()
+
+	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS keys, version, goose_db_version"); err != nil {
+		t.Fatalf("resetting schema: %v", err)
+	}
+
+	ks, err := New(ctx, pgConnStr, aes.NewCipher)
+	if err != nil {
+		t.Fatalf("creating test keystore: %v", err)
+	}
+	t.Cleanup(func() { ks.Close() })
+
+	return ks
+}
+
 func TestKeyStore(t *testing.T) {
 	if pgConnStr == "" {
 		t.Skip("Postgres connection not available")
 	}
 
-	ctx := context.Background()
-
-	db, err := sql.Open("pgx", pgConnStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	// Clean up database tables before running the test
-	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS keys, version, goose_db_version"); err != nil {
-		t.Fatal(err)
-	}
-
-	ks, err := New(ctx, pgConnStr, aes.NewCipher)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ks.Close()
-
-	if v := ks.Version(); v != 2 {
-		t.Errorf("got version %d, want 2", v)
-	}
-
-	_, _, err = ks.DecoderByID(ctx, 1)
-	if !errors.Is(err, encid.ErrNotFound) {
-		t.Errorf("got %v, want %v", err, encid.ErrNotFound)
-	}
-
-	_, _, err = ks.EncoderByType(ctx, 1)
-	if !errors.Is(err, encid.ErrNotFound) {
-		t.Errorf("got %v, want %v", err, encid.ErrNotFound)
-	}
-
-	id, err := ks.NewKey(ctx, 1, aes.BlockSize)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	typ, _, err := ks.DecoderByID(ctx, id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if typ != 1 {
-		t.Errorf("got type %d, want 1", typ)
-	}
-
-	gotID, _, err := ks.EncoderByType(ctx, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if gotID != id {
-		t.Errorf("got ID %d, want %d", gotID, id)
-	}
-
-	_, err = ks.NewKey(ctx, 2, aes.BlockSize)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testutil.EncodeDecode(ctx, t, ks, 2)
+	testutil.TestKeyStore(t, func(t *testing.T) testutil.KeyStoreTester {
+		return setupTestDB(t)
+	})
 }
 
 func TestErrs(t *testing.T) {
@@ -147,20 +112,6 @@ func TestErrs(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ks.Close()
-
-	t.Run("NoType", func(t *testing.T) {
-		_, _, err := ks.EncoderByType(ctx, 1)
-		if !errors.Is(err, encid.ErrNotFound) {
-			t.Errorf("got %v, want %v", err, encid.ErrNotFound)
-		}
-	})
-
-	t.Run("NoID", func(t *testing.T) {
-		_, _, err := ks.DecoderByID(ctx, 1)
-		if !errors.Is(err, encid.ErrNotFound) {
-			t.Errorf("got %v, want %v", err, encid.ErrNotFound)
-		}
-	})
 
 	t.Run("BadCipher", func(t *testing.T) {
 		ksBad, err := New(ctx, pgConnStr, func([]byte) (cipher.Block, error) {
