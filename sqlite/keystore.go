@@ -29,11 +29,31 @@ var migrations embed.FS
 // its version will be 1.
 // The version number controls whether the resulting encoded ids include a checksum.
 // Version 1 ids are not compatible with version 2 ids.
+//
+// The caller is responsible for closing the keystore with [Close] when it is no longer needed.
 func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, errors.Wrapf(err, "opening %s", filename)
 	}
+	return NewFromDB(ctx, db, true, newcipher)
+}
+
+// NewFromDB creates a new SQLite-backed keystore using the given database connection.
+// The newcipher function takes a key and returns a cipher for encrypting and decrypting.
+// If newcipher is nil, it defaults to [aes.NewCipher].
+//
+// If the keystore is new (i.e., contains no keys),
+// the version number of the keystore is set to 2.
+// If the keystore is non-empty and was created before v1.5.0 of this module,
+// its version will be 1.
+// The version number controls whether the resulting encoded ids include a checksum.
+// Version 1 ids are not compatible with version 2 ids.
+//
+// If own is true, then [Close] will close the underlying database connection.
+// Otherwise, closing the database connection is the caller's responsibility
+// and should not be done until after a call to Close.
+func NewFromDB(ctx context.Context, db *sql.DB, own bool, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
 
 	mfs, err := fs.Sub(migrations, "migrations")
 	if err != nil {
@@ -71,14 +91,36 @@ func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Bl
 
 	return &KeyStore{
 		db:        db,
+		own:       own,
 		newcipher: newcipher,
 		version:   version,
 	}, nil
 }
 
+// Close finalizes the KeyStore, releasing resources.
+// The KeyStore must not be used after calling Close.
+//
+// If the KeyStore "owns" the underlying database connection,
+// (which is the case unless it was created via [NewFromDB] with own == false),
+// Close closes the underlying database connection,
+// otherwise closing the database connection is the caller's responsibility
+// and should not be done until after closing the KeyStore.
+func (ks *KeyStore) Close() error {
+	if !ks.own {
+		return nil
+	}
+	db := ks.db
+	if db == nil {
+		return nil
+	}
+	ks.db = nil
+	return db.Close()
+}
+
 // KeyStore is an implementation of encid.KeyStore backed by a SQLite database.
 type KeyStore struct {
 	db        *sql.DB
+	own       bool
 	newcipher func([]byte) (cipher.Block, error)
 	version   int
 }
