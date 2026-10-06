@@ -182,4 +182,3 @@ func (ks *KeyStore) NewKey(ctx context.Context, typ, keysize int) (int64, error)
 
 	return res.LastInsertId()
 }
-

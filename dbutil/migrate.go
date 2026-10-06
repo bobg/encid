@@ -20,7 +20,7 @@ const InitialCutoff int64 = 20261006134557
 // it applies initSQL and records migrations up through initialCutoff as applied.
 // For databases with some migrations applied, it runs pending migrations normally.
 // In both cases, future migrations (versions > initialCutoff) will be run by Goose.
-func Migrate(ctx context.Context, db *sql.DB, dialect goose.Dialect, migrations fs.FS, initSQL string, initialCutoff int64) error {
+func Migrate(ctx context.Context, db *sql.DB, dialect goose.Dialect, migrations fs.FS, initSQL string, initialCutoff int64) (err error) {
 	mfs, err := fs.Sub(migrations, "migrations")
 	if err != nil {
 		return errors.Wrap(err, "getting migrations")
@@ -54,7 +54,12 @@ func Migrate(ctx context.Context, db *sql.DB, dialect goose.Dialect, migrations 
 		if err != nil {
 			return errors.Wrap(err, "beginning transaction for initial schema")
 		}
-		defer tx.Rollback()
+		defer func() {
+			if err != nil {
+				rollbackErr := tx.Rollback()
+				err = errors.Join(err, errors.Wrap(rollbackErr, "rolling back transaction"))
+			}
+		}()
 
 		if _, err := tx.ExecContext(ctx, initSQL); err != nil {
 			return errors.Wrap(err, "executing initial schema")

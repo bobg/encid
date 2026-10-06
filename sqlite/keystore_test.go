@@ -23,7 +23,7 @@ func TestKeyStore(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { os.RemoveAll(tmpdir) })
+		t.Cleanup(func() { os.RemoveAll(tmpdir) }) // nolint:errcheck
 
 		ctx := context.Background()
 		filename := filepath.Join(tmpdir, "keystore.db")
@@ -31,7 +31,7 @@ func TestKeyStore(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { ks.Close() })
+		t.Cleanup(func() { ks.Close() }) // nolint:errcheck
 
 		return ks
 	})
@@ -51,14 +51,14 @@ func TestErrs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpdir)
+	defer os.RemoveAll(tmpdir) // nolint:errcheck
 
 	filename := filepath.Join(tmpdir, "keystore.db")
 	ks, err := New(ctx, filename, aes.NewCipher)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ks.Close()
+	defer ks.Close() // nolint:errcheck
 
 	t.Run("BadCipher", func(t *testing.T) {
 		ks, err := New(ctx, filename, func([]byte) (cipher.Block, error) {
@@ -67,7 +67,7 @@ func TestErrs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer ks.Close()
+		defer ks.Close() // nolint:errcheck
 
 		keyID, err := ks.NewKey(ctx, 1, aes.BlockSize)
 		if err != nil {
@@ -355,4 +355,3 @@ func TestMigrations(t *testing.T) {
 		}
 	})
 }
-

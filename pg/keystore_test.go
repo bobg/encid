@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "failed to start embedded postgres on port %d: %v\n", port, err)
 		os.Exit(1)
 	}
-	defer postgres.Stop()
+	defer postgres.Stop() // nolint:errcheck
 
 	pgConnStr = fmt.Sprintf("postgres://postgres:postgres@127.0.0.1:%d/postgres?sslmode=disable", port)
 	os.Exit(m.Run())
@@ -49,7 +49,7 @@ func getFreePort() uint32 {
 	if err != nil {
 		return 15432
 	}
-	defer l.Close()
+	defer l.Close() // nolint:errcheck
 	return uint32(l.Addr().(*net.TCPAddr).Port)
 }
 
@@ -61,7 +61,7 @@ func setupTestDB(t *testing.T) *KeyStore {
 	if err != nil {
 		t.Fatalf("opening test db: %v", err)
 	}
-	defer db.Close()
+	defer db.Close() // nolint:errcheck
 
 	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version"); err != nil {
 		t.Fatalf("resetting schema: %v", err)
@@ -71,7 +71,7 @@ func setupTestDB(t *testing.T) *KeyStore {
 	if err != nil {
 		t.Fatalf("creating test keystore: %v", err)
 	}
-	t.Cleanup(func() { ks.Close() })
+	t.Cleanup(func() { ks.Close() }) // nolint:errcheck
 
 	return ks
 }
@@ -104,7 +104,7 @@ func TestErrs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer db.Close() // nolint:errcheck
 
 	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version"); err != nil {
 		t.Fatal(err)
@@ -114,7 +114,7 @@ func TestErrs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ks.Close()
+	defer ks.Close() // nolint:errcheck
 
 	t.Run("BadCipher", func(t *testing.T) {
 		ksBad, err := New(ctx, pgConnStr, func([]byte) (cipher.Block, error) {
@@ -123,7 +123,7 @@ func TestErrs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer ksBad.Close()
+		defer ksBad.Close() // nolint:errcheck
 
 		keyID, err := ksBad.NewKey(ctx, 1, aes.BlockSize)
 		if err != nil {
@@ -147,7 +147,7 @@ func TestNewFromDB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer db.Close() // nolint:errcheck
 
 	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version"); err != nil {
 		t.Fatal(err)
@@ -178,7 +178,7 @@ func TestMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer db.Close() // nolint:errcheck
 
 	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version"); err != nil {
 		t.Fatal(err)
@@ -189,7 +189,7 @@ func TestMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ks.Close()
+	defer ks.Close() // nolint:errcheck
 
 	// Verify encid_keys and encid_version exist
 	var count int
@@ -246,7 +246,7 @@ func TestMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer db.Close() // nolint:errcheck
 
 		if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version CASCADE"); err != nil {
 			t.Fatal(err)
@@ -256,7 +256,7 @@ func TestMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer ks.Close()
+		defer ks.Close() // nolint:errcheck
 
 		// Verify encid_keys and encid_version exist.
 		var count int
@@ -283,7 +283,7 @@ func TestMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer db.Close() // nolint:errcheck
 
 		if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version CASCADE"); err != nil {
 			t.Fatal(err)
@@ -304,7 +304,7 @@ func TestMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer ks.Close()
+		defer ks.Close() // nolint:errcheck
 
 		// Verify the host application's tables are unmodified.
 		var customVal string
@@ -342,7 +342,7 @@ func TestMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer db.Close() // nolint:errcheck
 
 		if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version CASCADE"); err != nil {
 			t.Fatal(err)
@@ -379,7 +379,7 @@ func TestMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer ks.Close()
+		defer ks.Close() // nolint:errcheck
 
 		// Migration should have run goose Up, renaming keys to encid_keys and version to encid_version.
 		typ, _, err := ks.DecoderByID(ctx, 1)
@@ -403,7 +403,7 @@ func TestMigrations(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer db.Close()
+				defer db.Close() // nolint:errcheck
 
 				if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version CASCADE"); err != nil {
 					t.Fatal(err)
@@ -440,7 +440,7 @@ func TestMigrations(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer ks.Close()
+				defer ks.Close() // nolint:errcheck
 
 				// Build a filesystem that contains the current migrations plus a future migration.
 				mapFS := make(fstest.MapFS)
@@ -483,4 +483,3 @@ func TestMigrations(t *testing.T) {
 		}
 	})
 }
-
