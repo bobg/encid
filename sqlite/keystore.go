@@ -68,18 +68,18 @@ func NewFromDB(ctx context.Context, db *sql.DB, own bool, newcipher func([]byte)
 	}
 
 	var nkeys int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM keys`).Scan(&nkeys); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM encid_keys`).Scan(&nkeys); err != nil {
 		return nil, errors.Wrap(err, "counting keys")
 	}
 	if nkeys == 0 {
-		const q = `UPDATE version SET version = 2 WHERE singleton = 0 AND version < 2`
+		const q = `UPDATE encid_version SET version = 2 WHERE singleton = 0 AND version < 2`
 		if _, err := db.ExecContext(ctx, q); err != nil {
 			return nil, errors.Wrap(err, "updating version")
 		}
 	}
 
 	var version int
-	err = db.QueryRowContext(ctx, `SELECT version FROM version WHERE singleton = 0`).Scan(&version)
+	err = db.QueryRowContext(ctx, `SELECT version FROM encid_version WHERE singleton = 0`).Scan(&version)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting version")
 	}
@@ -127,7 +127,7 @@ type KeyStore struct {
 var _ encid.KeyStore = &KeyStore{}
 
 func (ks *KeyStore) DecoderByID(ctx context.Context, id int64) (typ int, dec encid.Decrypter, err error) {
-	const q = `SELECT typ, k FROM keys WHERE id = $1`
+	const q = `SELECT typ, k FROM encid_keys WHERE id = $1`
 
 	var k []byte
 
@@ -148,7 +148,7 @@ func (ks *KeyStore) DecoderByID(ctx context.Context, id int64) (typ int, dec enc
 }
 
 func (ks *KeyStore) EncoderByType(ctx context.Context, typ int) (id int64, enc encid.Encrypter, err error) {
-	const q = `SELECT id, k FROM keys WHERE typ = $1 ORDER BY id DESC LIMIT 1`
+	const q = `SELECT id, k FROM encid_keys WHERE typ = $1 ORDER BY id DESC LIMIT 1`
 
 	var k []byte
 
@@ -178,7 +178,7 @@ func (ks *KeyStore) NewKey(ctx context.Context, typ, keysize int) (int64, error)
 		return 0, errors.Wrap(err, "generating key")
 	}
 
-	const q = `INSERT INTO keys (typ, k) VALUES ($1, $2)`
+	const q = `INSERT INTO encid_keys (typ, k) VALUES ($1, $2)`
 
 	res, err := ks.db.ExecContext(ctx, q, typ, k)
 	if err != nil {

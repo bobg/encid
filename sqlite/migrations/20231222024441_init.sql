@@ -11,5 +11,7 @@ CREATE INDEX IF NOT EXISTS keys_typ_index ON keys (typ);
 
 -- +goose Down
 -- +goose StatementBegin
-SELECT 'down SQL query';
+DROP INDEX IF EXISTS keys_typ_index;
+
+DROP TABLE IF EXISTS keys;
 -- +goose StatementEnd
