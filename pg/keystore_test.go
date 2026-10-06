@@ -35,9 +35,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "failed to start embedded postgres on port %d: %v\n", port, err)
 		os.Exit(1)
 	}
-	defer func() {
-		_ = postgres.Stop()
-	}()
+	defer postgres.Stop()
 
 	pgConnStr = fmt.Sprintf("postgres://postgres:postgres@127.0.0.1:%d/postgres?sslmode=disable", port)
 	os.Exit(m.Run())
