@@ -1,4 +1,4 @@
-package sqlite
+package pg
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"embed"
 
 	"github.com/bobg/errors"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
 	"github.com/bobg/encid/v2"
@@ -24,7 +24,7 @@ var migrations embed.FS
 
 const initialCutoff = dbutil.InitialCutoff
 
-// New creates a new SQLite-backed keystore using the given file.
+// New creates a new PostgreSQL-backed keystore using the given connection string.
 // The newcipher function takes a key and returns a cipher for encrypting and decrypting.
 // If newcipher is nil, it defaults to [aes.NewCipher].
 //
@@ -36,15 +36,15 @@ const initialCutoff = dbutil.InitialCutoff
 // Version 1 ids are not compatible with version 2 ids.
 //
 // The caller is responsible for closing the keystore with [Close] when it is no longer needed.
-func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
-	db, err := sql.Open("sqlite3", filename)
+func New(ctx context.Context, connStr string, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
+	db, err := sql.Open("pgx", connStr)
 	if err != nil {
-		return nil, errors.Wrapf(err, "opening %s", filename)
+		return nil, errors.Wrap(err, "opening postgres database")
 	}
 	return NewFromDB(ctx, db, true, newcipher)
 }
 
-// NewFromDB creates a new SQLite-backed keystore using the given database connection.
+// NewFromDB creates a new PostgreSQL-backed keystore using the given database connection.
 // The newcipher function takes a key and returns a cipher for encrypting and decrypting.
 // If newcipher is nil, it defaults to [aes.NewCipher].
 //
@@ -59,7 +59,7 @@ func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Bl
 // Otherwise, closing the database connection is the caller's responsibility
 // and should not be done until after a call to Close.
 func NewFromDB(ctx context.Context, db *sql.DB, own bool, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
-	if err := dbutil.Migrate(ctx, db, goose.DialectSQLite3, migrations, initSQL, initialCutoff); err != nil {
+	if err := dbutil.Migrate(ctx, db, goose.DialectPostgres, migrations, initSQL, initialCutoff); err != nil {
 		return nil, errors.Wrap(err, "running migrations")
 	}
 
@@ -111,7 +111,7 @@ func (ks *KeyStore) Close() error {
 	return db.Close()
 }
 
-// KeyStore is an implementation of encid.KeyStore backed by a SQLite database.
+// KeyStore is an implementation of encid.KeyStore backed by a PostgreSQL database.
 type KeyStore struct {
 	db        *sql.DB
 	own       bool
@@ -173,12 +173,13 @@ func (ks *KeyStore) NewKey(ctx context.Context, typ, keysize int) (int64, error)
 		return 0, errors.Wrap(err, "generating key")
 	}
 
-	const q = `INSERT INTO encid_keys (typ, k) VALUES ($1, $2)`
+	const q = `INSERT INTO encid_keys (typ, k) VALUES ($1, $2) RETURNING id`
 
-	res, err := ks.db.ExecContext(ctx, q, typ, k)
+	var id int64
+	err := ks.db.QueryRowContext(ctx, q, typ, k).Scan(&id)
 	if err != nil {
 		return 0, errors.Wrap(err, "inserting key")
 	}
 
-	return res.LastInsertId()
+	return id, nil
 }
