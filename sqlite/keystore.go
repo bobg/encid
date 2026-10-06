@@ -7,14 +7,13 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"embed"
-	"io/fs"
 
 	"github.com/bobg/errors"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
-	"github.com/pressly/goose/v3/database"
 
 	"github.com/bobg/encid/v2"
+	"github.com/bobg/encid/v2/dbutil"
 )
 
 //go:embed init.sql
@@ -23,7 +22,7 @@ var initSQL string
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-const initialCutoff int64 = 20261006134557
+const initialCutoff = dbutil.InitialCutoff
 
 // New creates a new SQLite-backed keystore using the given file.
 // The newcipher function takes a key and returns a cipher for encrypting and decrypting.
@@ -60,7 +59,7 @@ func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Bl
 // Otherwise, closing the database connection is the caller's responsibility
 // and should not be done until after a call to Close.
 func NewFromDB(ctx context.Context, db *sql.DB, own bool, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
-	if err := migrate(ctx, db); err != nil {
+	if err := dbutil.Migrate(ctx, db, goose.DialectSQLite3, migrations, initSQL, initialCutoff); err != nil {
 		return nil, errors.Wrap(err, "running migrations")
 	}
 
@@ -184,62 +183,3 @@ func (ks *KeyStore) NewKey(ctx context.Context, typ, keysize int) (int64, error)
 	return res.LastInsertId()
 }
 
-func migrate(ctx context.Context, db *sql.DB) error {
-	mfs, err := fs.Sub(migrations, "migrations")
-	if err != nil {
-		return errors.Wrap(err, "getting migrations")
-	}
-
-	provider, err := goose.NewProvider(goose.DialectSQLite3, db, mfs, goose.WithVerbose(false))
-	if err != nil {
-		return errors.Wrap(err, "creating goose provider")
-	}
-
-	status, err := provider.Status(ctx)
-	if err != nil {
-		return errors.Wrap(err, "getting migration status")
-	}
-
-	var anyApplied bool
-	for _, s := range status {
-		if s.State == goose.StateApplied {
-			anyApplied = true
-			break
-		}
-	}
-
-	if !anyApplied {
-		store, err := database.NewStore(goose.DialectSQLite3, goose.DefaultTablename)
-		if err != nil {
-			return errors.Wrap(err, "creating goose store")
-		}
-
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return errors.Wrap(err, "beginning transaction for initial schema")
-		}
-		defer tx.Rollback()
-
-		if _, err := tx.ExecContext(ctx, initSQL); err != nil {
-			return errors.Wrap(err, "executing initial schema")
-		}
-
-		for _, s := range status {
-			if s.Source.Version <= initialCutoff {
-				if err := store.Insert(ctx, tx, database.InsertRequest{Version: s.Source.Version}); err != nil {
-					return errors.Wrapf(err, "recording migration %d", s.Source.Version)
-				}
-			}
-		}
-
-		if err := tx.Commit(); err != nil {
-			return errors.Wrap(err, "committing transaction")
-		}
-	}
-
-	if _, err := provider.Up(ctx); err != nil {
-		return errors.Wrap(err, "running migrations")
-	}
-
-	return nil
-}

@@ -7,17 +7,22 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"embed"
-	"io/fs"
 
 	"github.com/bobg/errors"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
 	"github.com/bobg/encid/v2"
+	"github.com/bobg/encid/v2/dbutil"
 )
+
+//go:embed init.sql
+var initSQL string
 
 //go:embed migrations/*.sql
 var migrations embed.FS
+
+const initialCutoff = dbutil.InitialCutoff
 
 // New creates a new PostgreSQL-backed keystore using the given connection string.
 // The newcipher function takes a key and returns a cipher for encrypting and decrypting.
@@ -54,16 +59,7 @@ func New(ctx context.Context, connStr string, newcipher func([]byte) (cipher.Blo
 // Otherwise, closing the database connection is the caller's responsibility
 // and should not be done until after a call to Close.
 func NewFromDB(ctx context.Context, db *sql.DB, own bool, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
-	mfs, err := fs.Sub(migrations, "migrations")
-	if err != nil {
-		return nil, errors.Wrap(err, "getting migrations")
-	}
-
-	provider, err := goose.NewProvider(goose.DialectPostgres, db, mfs, goose.WithVerbose(false))
-	if err != nil {
-		return nil, errors.Wrap(err, "creating goose provider")
-	}
-	if _, err := provider.Up(ctx); err != nil {
+	if err := dbutil.Migrate(ctx, db, goose.DialectPostgres, migrations, initSQL, initialCutoff); err != nil {
 		return nil, errors.Wrap(err, "running migrations")
 	}
 
@@ -79,8 +75,7 @@ func NewFromDB(ctx context.Context, db *sql.DB, own bool, newcipher func([]byte)
 	}
 
 	var version int
-	err = db.QueryRowContext(ctx, `SELECT version FROM encid_version WHERE singleton = 0`).Scan(&version)
-	if err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT version FROM encid_version WHERE singleton = 0`).Scan(&version); err != nil {
 		return nil, errors.Wrap(err, "getting version")
 	}
 
