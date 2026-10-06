@@ -43,7 +43,7 @@ func run() error {
 	if err != nil {
 		return errors.Wrapf(err, "opening %s", ksfile)
 	}
-	defer ks.Close()
+	defer ks.Close() // nolint:errcheck
 
 	c := maincmd{ks: ks}
 

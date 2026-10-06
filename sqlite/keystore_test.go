@@ -85,7 +85,7 @@ func TestNewFromDB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpdir)
+	defer os.RemoveAll(tmpdir) // nolint:errcheck
 
 	ctx := context.Background()
 
@@ -94,7 +94,7 @@ func TestNewFromDB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer db.Close() // nolint:errcheck
 
 	ks, err := NewFromDB(ctx, db, false, aes.NewCipher)
 	if err != nil {
@@ -117,20 +117,20 @@ func TestMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll(tmpdir)
+		defer os.RemoveAll(tmpdir) // nolint:errcheck
 
 		filename := filepath.Join(tmpdir, "keystore.db")
 		db, err := sql.Open("sqlite3", filename)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer db.Close() // nolint:errcheck
 
 		ks, err := NewFromDB(ctx, db, false, aes.NewCipher)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer ks.Close()
+		defer ks.Close() // nolint:errcheck
 
 		// Verify encid_keys and encid_version exist.
 		var count int
@@ -157,14 +157,14 @@ func TestMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll(tmpdir)
+		defer os.RemoveAll(tmpdir) // nolint:errcheck
 
 		filename := filepath.Join(tmpdir, "keystore.db")
 		db, err := sql.Open("sqlite3", filename)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer db.Close() // nolint:errcheck
 
 		// Simulate pre-existing host application tables named `keys` and `version`.
 		_, err = db.ExecContext(ctx, `
@@ -181,7 +181,7 @@ func TestMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer ks.Close()
+		defer ks.Close() // nolint:errcheck
 
 		// Verify the host application's tables are unmodified.
 		var customVal string
@@ -219,14 +219,14 @@ func TestMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll(tmpdir)
+		defer os.RemoveAll(tmpdir) // nolint:errcheck
 
 		filename := filepath.Join(tmpdir, "keystore.db")
 		db, err := sql.Open("sqlite3", filename)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer db.Close() // nolint:errcheck
 
 		// Simulate database created by an older version of encid (e.g. migration 20231222024441).
 		// Create keys table and goose_db_version with migration 20231222024441 applied.
@@ -254,7 +254,7 @@ func TestMigrations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer ks.Close()
+		defer ks.Close() // nolint:errcheck
 
 		// Migration should have run goose Up, renaming keys to encid_keys and creating encid_version.
 		typ, _, err := ks.DecoderByID(ctx, 1)
@@ -278,14 +278,14 @@ func TestMigrations(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer os.RemoveAll(tmpdir)
+				defer os.RemoveAll(tmpdir) // nolint:errcheck
 
 				filename := filepath.Join(tmpdir, "keystore.db")
 				db, err := sql.Open("sqlite3", filename)
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer db.Close()
+				defer db.Close() // nolint:errcheck
 
 				if scenario == "migrated" {
 					_, err = db.ExecContext(ctx, `
@@ -312,7 +312,7 @@ func TestMigrations(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer ks.Close()
+				defer ks.Close() // nolint:errcheck
 
 				// Build a filesystem that contains the current migrations plus a future migration.
 				mapFS := make(fstest.MapFS)
