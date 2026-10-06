@@ -7,11 +7,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 	"testing"
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
+	"github.com/pressly/goose/v3"
 
 	"github.com/bobg/encid/v2/testutil"
 )
@@ -60,7 +62,7 @@ func setupTestDB(t *testing.T) *KeyStore {
 	}
 	defer db.Close()
 
-	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS keys, version, goose_db_version"); err != nil {
+	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version"); err != nil {
 		t.Fatalf("resetting schema: %v", err)
 	}
 
@@ -103,7 +105,7 @@ func TestErrs(t *testing.T) {
 	}
 	defer db.Close()
 
-	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS keys, version, goose_db_version"); err != nil {
+	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -146,7 +148,7 @@ func TestNewFromDB(t *testing.T) {
 	}
 	defer db.Close()
 
-	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS keys, version, goose_db_version"); err != nil {
+	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -163,3 +165,71 @@ func TestNewFromDB(t *testing.T) {
 		t.Errorf("db should still be pingable after closing unowned keystore: %v", err)
 	}
 }
+
+func TestMigration(t *testing.T) {
+	if pgConnStr == "" {
+		t.Skip("Postgres connection not available")
+	}
+
+	ctx := context.Background()
+
+	db, err := sql.Open("pgx", pgConnStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Run all migrations up
+	ks, err := NewFromDB(ctx, db, false, aes.NewCipher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ks.Close()
+
+	// Verify encid_keys and encid_version exist
+	var count int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM encid_keys").Scan(&count); err != nil {
+		t.Fatalf("querying encid_keys: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM encid_version").Scan(&count); err != nil {
+		t.Fatalf("querying encid_version: %v", err)
+	}
+
+	// Verify index exists
+	var indexName string
+	err = db.QueryRowContext(ctx, "SELECT indexname FROM pg_indexes WHERE indexname = 'encid_keys_typ_index'").Scan(&indexName)
+	if err != nil {
+		t.Fatalf("querying encid_keys_typ_index: %v", err)
+	}
+
+	mfs, err := fs.Sub(migrations, "migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := goose.NewProvider(goose.DialectPostgres, db, mfs, goose.WithVerbose(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Roll back 1 migration (down to init)
+	if _, err := provider.Down(ctx); err != nil {
+		t.Fatalf("rolling back migration: %v", err)
+	}
+
+	// Verify keys, version, and keys_typ_index exist
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM keys").Scan(&count); err != nil {
+		t.Fatalf("querying keys after rollback: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM version").Scan(&count); err != nil {
+		t.Fatalf("querying version after rollback: %v", err)
+	}
+	err = db.QueryRowContext(ctx, "SELECT indexname FROM pg_indexes WHERE indexname = 'keys_typ_index'").Scan(&indexName)
+	if err != nil {
+		t.Fatalf("querying keys_typ_index after rollback: %v", err)
+	}
+}
+
