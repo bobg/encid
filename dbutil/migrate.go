@@ -20,13 +20,34 @@ const InitialCutoff int64 = 20261006134557
 // it applies initSQL and records migrations up through initialCutoff as applied.
 // For databases with some migrations applied, it runs pending migrations normally.
 // In both cases, future migrations (versions > initialCutoff) will be run by Goose.
+//
+// Callers that combine an encid schema in the same database as other goose-based migrations should use [MigrateSchema] instead.
+// (This function calls MigrateSchema with an empty migrationsTableName.)
 func Migrate(ctx context.Context, db *sql.DB, dialect goose.Dialect, migrations fs.FS, initSQL string, initialCutoff int64) (err error) {
+	return MigrateSchema(ctx, db, dialect, migrations, initSQL, initialCutoff, "")
+}
+
+// Migrate runs migrations for the given database.
+// For databases without any encid migrations applied yet,
+// it applies initSQL and records migrations up through initialCutoff as applied.
+// For databases with some migrations applied, it runs pending migrations normally.
+// In both cases, future migrations (versions > initialCutoff) will be run by Goose.
+//
+// Migrations are recorded in the table named by migrationsTableName.
+// If migrationsTableName is empty, the default goose table name is used
+// ("goose_db_version").
+func MigrateSchema(ctx context.Context, db *sql.DB, dialect goose.Dialect, migrations fs.FS, initSQL string, initialCutoff int64, migrationsTableName string) (err error) {
 	mfs, err := fs.Sub(migrations, "migrations")
 	if err != nil {
 		return errors.Wrap(err, "getting migrations")
 	}
 
-	provider, err := goose.NewProvider(dialect, db, mfs, goose.WithVerbose(false))
+	opts := []goose.ProviderOption{goose.WithVerbose(false)}
+	if migrationsTableName != "" {
+		opts = append(opts, goose.WithTableName(migrationsTableName))
+	}
+
+	provider, err := goose.NewProvider(dialect, db, mfs, opts...)
 	if err != nil {
 		return errors.Wrap(err, "creating goose provider")
 	}
@@ -84,3 +105,8 @@ func Migrate(ctx context.Context, db *sql.DB, dialect goose.Dialect, migrations 
 
 	return nil
 }
+
+// SchemaTableName is the name of the table used to track schema migrations.
+// If unset, migrations use the default from the goose package, which is "goose_db_version".
+// Set this variable before calling [New] or [NewFromDB] to avoid conflicts with other uses of goose in the same database.
+var SchemaTableName string
