@@ -5,13 +5,13 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"database/sql"
-	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 	"testing/fstest"
 
+	"github.com/bobg/errors"
 	"github.com/pressly/goose/v3"
 
 	"github.com/bobg/encid/v2/testutil"
@@ -481,7 +481,7 @@ func TestMigrations(t *testing.T) {
 					}
 					content, err := fs.ReadFile(mfs, path)
 					if err != nil {
-						return err
+						return errors.Wrapf(err, "reading %q", path)
 					}
 					mapFS[path] = &fstest.MapFile{Data: content}
 					return nil

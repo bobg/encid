@@ -32,7 +32,7 @@ func (tks KeyStore) DecoderByID(_ context.Context, keyID int64) (int, encid.Decr
 	if err != nil {
 		return 0, nil, err
 	}
-	return int(keyID) % n, ciph, err
+	return int(keyID) % n, ciph, nil
 }
 
 func (tks KeyStore) EncoderByType(_ context.Context, typ int) (int64, encid.Encrypter, error) {
@@ -41,7 +41,7 @@ func (tks KeyStore) EncoderByType(_ context.Context, typ int) (int64, encid.Encr
 	if err != nil {
 		return 0, nil, err
 	}
-	return id, ciph, err
+	return id, ciph, nil
 }
 
 func (tks KeyStore) Version() int {
