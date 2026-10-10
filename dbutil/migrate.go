@@ -37,6 +37,10 @@ func Migrate(ctx context.Context, db *sql.DB, dialect goose.Dialect, migrations 
 // If migrationsTableName is empty, the default goose table name is used
 // ("goose_db_version").
 func MigrateSchema(ctx context.Context, db *sql.DB, dialect goose.Dialect, migrations fs.FS, initSQL string, initialCutoff int64, migrationsTableName string) (err error) {
+	if migrationsTableName == "" {
+		migrationsTableName = goose.DefaultTablename
+	}
+
 	mfs, err := fs.Sub(migrations, "migrations")
 	if err != nil {
 		return errors.Wrap(err, "getting migrations")
@@ -66,7 +70,7 @@ func MigrateSchema(ctx context.Context, db *sql.DB, dialect goose.Dialect, migra
 	}
 
 	if !anyApplied {
-		store, err := database.NewStore(dialect, goose.DefaultTablename)
+		store, err := database.NewStore(dialect, migrationsTableName)
 		if err != nil {
 			return errors.Wrap(err, "creating goose store")
 		}
@@ -105,8 +109,3 @@ func MigrateSchema(ctx context.Context, db *sql.DB, dialect goose.Dialect, migra
 
 	return nil
 }
-
-// SchemaTableName is the name of the table used to track schema migrations.
-// If unset, migrations use the default from the goose package, which is "goose_db_version".
-// Set this variable before calling [New] or [NewFromDB] to avoid conflicts with other uses of goose in the same database.
-var SchemaTableName string
