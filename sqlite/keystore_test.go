@@ -5,13 +5,13 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"database/sql"
-	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 	"testing/fstest"
 
+	"github.com/bobg/errors"
 	"github.com/pressly/goose/v3"
 
 	"github.com/bobg/encid/v2/testutil"
@@ -271,8 +271,168 @@ func TestMigrations(t *testing.T) {
 		}
 	})
 
+	t.Run("CustomMigrationsTable", func(t *testing.T) {
+		tmpdir, err := os.MkdirTemp("", "keystore_test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(tmpdir) // nolint:errcheck
+
+		filename := filepath.Join(tmpdir, "keystore.db")
+		db, err := sql.Open("sqlite3", filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db.Close() // nolint:errcheck
+
+		ks, err := NewSchemaFromDB(ctx, db, "custom_goose_version", false, aes.NewCipher)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ks.Close() // nolint:errcheck
+
+		// Verify custom migrations table exists and recorded migrations.
+		var count int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM custom_goose_version`).Scan(&count); err != nil {
+			t.Fatalf("custom_goose_version table should exist: %v", err)
+		}
+		if count == 0 {
+			t.Error("custom_goose_version table should have recorded migrations, got 0")
+		}
+
+		// Verify default goose_db_version does NOT exist.
+		var exists int
+		err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='goose_db_version'`).Scan(&exists)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if exists != 0 {
+			t.Errorf("goose_db_version should not exist when MigrationsTable is customized, found %d", exists)
+		}
+
+		// Verify keystore works normally.
+		keyID, err := ks.NewKey(ctx, 1, aes.BlockSize)
+		if err != nil {
+			t.Fatalf("NewKey failed: %v", err)
+		}
+		typ, _, err := ks.DecoderByID(ctx, keyID)
+		if err != nil {
+			t.Fatalf("DecoderByID failed: %v", err)
+		}
+		if typ != 1 {
+			t.Errorf("got key type %d, want 1", typ)
+		}
+
+		// Also verify NewSchema constructor.
+		filename2 := filepath.Join(tmpdir, "keystore2.db")
+		ks2, err := NewSchema(ctx, filename2, "custom_goose_version_2", aes.NewCipher)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ks2.Close() // nolint:errcheck
+
+		db2, err := sql.Open("sqlite3", filename2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db2.Close() // nolint:errcheck
+
+		if err := db2.QueryRowContext(ctx, `SELECT COUNT(*) FROM custom_goose_version_2`).Scan(&count); err != nil {
+			t.Fatalf("custom_goose_version_2 table should exist: %v", err)
+		}
+		if count == 0 {
+			t.Error("custom_goose_version_2 table should have recorded migrations, got 0")
+		}
+	})
+
+	t.Run("CoexistingGooseSchemas", func(t *testing.T) {
+		tmpdir, err := os.MkdirTemp("", "keystore_test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(tmpdir) // nolint:errcheck
+
+		filename := filepath.Join(tmpdir, "keystore.db")
+		db, err := sql.Open("sqlite3", filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db.Close() // nolint:errcheck
+
+		// Host application creates its own goose_db_version table and host table.
+		_, err = db.ExecContext(ctx, `
+			CREATE TABLE goose_db_version (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				version_id INTEGER NOT NULL,
+				is_applied INTEGER NOT NULL,
+				tstamp TIMESTAMP DEFAULT (datetime('now'))
+			);
+			INSERT INTO goose_db_version (version_id, is_applied) VALUES (0, 1), (100, 1);
+			CREATE TABLE host_items (
+				id INTEGER PRIMARY KEY,
+				name TEXT NOT NULL
+			);
+			INSERT INTO host_items (id, name) VALUES (1, 'item-one');
+		`)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ks, err := NewSchemaFromDB(ctx, db, "encid_schema_version", false, aes.NewCipher)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ks.Close() // nolint:errcheck
+
+		// Verify host data is intact.
+		var hostName string
+		if err := db.QueryRowContext(ctx, `SELECT name FROM host_items WHERE id = 1`).Scan(&hostName); err != nil {
+			t.Fatalf("reading host_items failed: %v", err)
+		}
+		if hostName != "item-one" {
+			t.Errorf("got host_items name %q, want 'item-one'", hostName)
+		}
+
+		// Verify host goose_db_version only has the host migrations (version 0 and 100).
+		var hostVersionCount int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM goose_db_version`).Scan(&hostVersionCount); err != nil {
+			t.Fatalf("reading goose_db_version failed: %v", err)
+		}
+		if hostVersionCount != 2 {
+			t.Errorf("goose_db_version should have 2 rows, got %d", hostVersionCount)
+		}
+
+		// Verify encid's migrations are recorded in encid_schema_version.
+		var encidVersionCount int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM encid_schema_version`).Scan(&encidVersionCount); err != nil {
+			t.Fatalf("reading encid_schema_version failed: %v", err)
+		}
+		if encidVersionCount == 0 {
+			t.Error("encid_schema_version should have recorded migrations, got 0")
+		}
+
+		// Verify encid functionality.
+		keyID, err := ks.NewKey(ctx, 1, aes.BlockSize)
+		if err != nil {
+			t.Fatalf("NewKey failed: %v", err)
+		}
+		typ, _, err := ks.DecoderByID(ctx, keyID)
+		if err != nil {
+			t.Fatalf("DecoderByID failed: %v", err)
+		}
+		if typ != 1 {
+			t.Errorf("got key type %d, want 1", typ)
+		}
+
+		// Verify host can still insert / apply migrations to goose_db_version without conflict.
+		_, err = db.ExecContext(ctx, `INSERT INTO goose_db_version (version_id, is_applied) VALUES (101, 1)`)
+		if err != nil {
+			t.Fatalf("host inserting into goose_db_version failed: %v", err)
+		}
+	})
+
 	t.Run("FutureMigrations", func(t *testing.T) {
-		for _, scenario := range []string{"fresh", "migrated"} {
+		for _, scenario := range []string{"fresh", "migrated", "custom_table"} {
 			t.Run(scenario, func(t *testing.T) {
 				tmpdir, err := os.MkdirTemp("", "keystore_test")
 				if err != nil {
@@ -287,7 +447,16 @@ func TestMigrations(t *testing.T) {
 				}
 				defer db.Close() // nolint:errcheck
 
-				if scenario == "migrated" {
+				var opts []goose.ProviderOption
+				opts = append(opts, goose.WithVerbose(false))
+
+				var migrationsTable string
+				switch scenario {
+				case "custom_table":
+					migrationsTable = "custom_goose_version"
+					opts = append(opts, goose.WithTableName(migrationsTable))
+
+				case "migrated":
 					_, err = db.ExecContext(ctx, `
 						CREATE TABLE goose_db_version (
 							id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -308,7 +477,7 @@ func TestMigrations(t *testing.T) {
 					}
 				}
 
-				ks, err := NewFromDB(ctx, db, false, aes.NewCipher)
+				ks, err := NewSchemaFromDB(ctx, db, migrationsTable, false, aes.NewCipher)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -326,7 +495,7 @@ func TestMigrations(t *testing.T) {
 					}
 					content, err := fs.ReadFile(mfs, path)
 					if err != nil {
-						return err
+						return errors.Wrapf(err, "reading %q", path)
 					}
 					mapFS[path] = &fstest.MapFile{Data: content}
 					return nil
@@ -339,7 +508,7 @@ func TestMigrations(t *testing.T) {
 					Data: []byte("-- +goose Up\nALTER TABLE encid_keys ADD COLUMN extra TEXT;\n\n-- +goose Down\nALTER TABLE encid_keys DROP COLUMN extra;\n"),
 				}
 
-				provider, err := goose.NewProvider(goose.DialectSQLite3, db, mapFS, goose.WithVerbose(false))
+				provider, err := goose.NewProvider(goose.DialectSQLite3, db, mapFS, opts...)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -350,6 +519,17 @@ func TestMigrations(t *testing.T) {
 				// Verify column 'extra' exists on encid_keys.
 				if _, err := db.ExecContext(ctx, `SELECT extra FROM encid_keys`); err != nil {
 					t.Errorf("future migration was not applied: %v", err)
+				}
+
+				if scenario == "custom_table" {
+					var exists int
+					err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='goose_db_version'`).Scan(&exists)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if exists != 0 {
+						t.Errorf("goose_db_version should not exist, found %d", exists)
+					}
 				}
 			})
 		}
