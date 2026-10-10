@@ -50,6 +50,9 @@ func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Bl
 // When empty, the default goose table name is used ("goose_db_version").
 // Callers wishing to combine an encid schema in the same database as other goose-based migrations
 // should set this to a non-empty value to avoid conflicts.
+// Beware: Use a consistent value for migrationsTable!
+// Changing the value of migrationsTable in a database where an encid schema already exists
+// can lead to data loss.
 //
 // If the keystore is new (i.e., contains no keys),
 // the version number of the keystore is set to 2.
@@ -95,6 +98,9 @@ func NewFromDB(ctx context.Context, db *sql.DB, own bool, newcipher func([]byte)
 // When empty, the default goose table name is used ("goose_db_version").
 // Callers wishing to combine an encid schema in the same database as other goose-based migrations
 // should set this to a non-empty value to avoid conflicts.
+// Beware: Use a consistent value for migrationsTable!
+// Changing the value of migrationsTable in a database where an encid schema already exists
+// can lead to data loss.
 //
 // If the keystore is new (i.e., contains no keys),
 // the version number of the keystore is set to 2.
