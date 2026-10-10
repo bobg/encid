@@ -44,6 +44,13 @@ func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Bl
 	return NewFromDB(ctx, db, true, newcipher)
 }
 
+// MigrationsTable is the name of the table used to record applied schema migrations.
+// When empty, the default goose table name is used ("goose_db_version").
+// Callers that combine an encid schema in the same database as other goose-based migrations
+// should set this to a non-empty value to avoid conflicts.
+// See [dbutil.MigrateSchema].
+var MigrationsTable string
+
 // NewFromDB creates a new SQLite-backed keystore using the given database connection.
 // The newcipher function takes a key and returns a cipher for encrypting and decrypting.
 // If newcipher is nil, it defaults to [aes.NewCipher].
@@ -59,7 +66,7 @@ func New(ctx context.Context, filename string, newcipher func([]byte) (cipher.Bl
 // Otherwise, closing the database connection is the caller's responsibility
 // and should not be done until after a call to Close.
 func NewFromDB(ctx context.Context, db *sql.DB, own bool, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
-	if err := dbutil.Migrate(ctx, db, goose.DialectSQLite3, migrations, initSQL, initialCutoff); err != nil {
+	if err := dbutil.MigrateSchema(ctx, db, goose.DialectSQLite3, migrations, initSQL, initialCutoff, MigrationsTable); err != nil {
 		return nil, errors.Wrap(err, "running migrations")
 	}
 

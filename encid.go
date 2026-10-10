@@ -190,4 +190,3 @@ func decode(ctx context.Context, ks KeyStore, keyID int64, inp string, base base
 	}
 	return typ, n, nil
 }
-
