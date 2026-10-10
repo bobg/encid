@@ -46,12 +46,7 @@ func MigrateSchema(ctx context.Context, db *sql.DB, dialect goose.Dialect, migra
 		return errors.Wrap(err, "getting migrations")
 	}
 
-	opts := []goose.ProviderOption{goose.WithVerbose(false)}
-	if migrationsTableName != "" {
-		opts = append(opts, goose.WithTableName(migrationsTableName))
-	}
-
-	provider, err := goose.NewProvider(dialect, db, mfs, opts...)
+	provider, err := goose.NewProvider(dialect, db, mfs, goose.WithVerbose(false), goose.WithTableName(migrationsTableName))
 	if err != nil {
 		return errors.Wrap(err, "creating goose provider")
 	}
