@@ -27,7 +27,7 @@ func Migrate(ctx context.Context, db *sql.DB, dialect goose.Dialect, migrations 
 	return MigrateSchema(ctx, db, dialect, migrations, initSQL, initialCutoff, "")
 }
 
-// Migrate runs migrations for the given database.
+// MigrateSchema runs migrations for the given database.
 // For databases without any encid migrations applied yet,
 // it applies initSQL and records migrations up through initialCutoff as applied.
 // For databases with some migrations applied, it runs pending migrations normally.

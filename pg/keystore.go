@@ -25,6 +25,7 @@ var migrations embed.FS
 const initialCutoff = dbutil.InitialCutoff
 
 // New creates a new PostgreSQL-backed keystore using the given connection string.
+//
 // The newcipher function takes a key and returns a cipher for encrypting and decrypting.
 // If newcipher is nil, it defaults to [aes.NewCipher].
 //
@@ -37,21 +38,37 @@ const initialCutoff = dbutil.InitialCutoff
 //
 // The caller is responsible for closing the keystore with [Close] when it is no longer needed.
 func New(ctx context.Context, connStr string, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
+	return NewSchema(ctx, connStr, "", newcipher)
+}
+
+// New creates a new PostgreSQL-backed keystore using the given connection string.
+//
+// The newcipher function takes a key and returns a cipher for encrypting and decrypting.
+// If newcipher is nil, it defaults to [aes.NewCipher].
+//
+// If migrationsTable is non-empty, it is used as the name of the table used to record applied schema migrations.
+// When empty, the default goose table name is used ("goose_db_version").
+// Callers wishing to combine an encid schema in the same database as other goose-based migrations
+// should set this to a non-empty value to avoid conflicts.
+//
+// If the keystore is new (i.e., contains no keys),
+// the version number of the keystore is set to 2.
+// If the keystore is non-empty and was created before v1.5.0 of this module,
+// its version will be 1.
+// The version number controls whether the resulting encoded ids include a checksum.
+// Version 1 ids are not compatible with version 2 ids.
+//
+// The caller is responsible for closing the keystore with [Close] when it is no longer needed.
+func NewSchema(ctx context.Context, connStr, migrationsTable string, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		return nil, errors.Wrap(err, "opening postgres database")
 	}
-	return NewFromDB(ctx, db, true, newcipher)
+	return NewSchemaFromDB(ctx, db, migrationsTable, true, newcipher)
 }
 
-// MigrationsTable is the name of the table used to record applied schema migrations.
-// When empty, the default goose table name is used ("goose_db_version").
-// Callers that combine an encid schema in the same database as other goose-based migrations
-// should set this to a non-empty value to avoid conflicts.
-// See [dbutil.MigrateSchema].
-var MigrationsTable string
-
 // NewFromDB creates a new PostgreSQL-backed keystore using the given database connection.
+//
 // The newcipher function takes a key and returns a cipher for encrypting and decrypting.
 // If newcipher is nil, it defaults to [aes.NewCipher].
 //
@@ -66,7 +83,31 @@ var MigrationsTable string
 // Otherwise, closing the database connection is the caller's responsibility
 // and should not be done until after a call to Close.
 func NewFromDB(ctx context.Context, db *sql.DB, own bool, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
-	if err := dbutil.MigrateSchema(ctx, db, goose.DialectPostgres, migrations, initSQL, initialCutoff, MigrationsTable); err != nil {
+	return NewSchemaFromDB(ctx, db, "", own, newcipher)
+}
+
+// NewSchemaFromDB creates a new PostgreSQL-backed keystore using the given database connection.
+//
+// The newcipher function takes a key and returns a cipher for encrypting and decrypting.
+// If newcipher is nil, it defaults to [aes.NewCipher].
+//
+// If migrationsTable is non-empty, it is used as the name of the table used to record applied schema migrations.
+// When empty, the default goose table name is used ("goose_db_version").
+// Callers wishing to combine an encid schema in the same database as other goose-based migrations
+// should set this to a non-empty value to avoid conflicts.
+//
+// If the keystore is new (i.e., contains no keys),
+// the version number of the keystore is set to 2.
+// If the keystore is non-empty and was created before v1.5.0 of this module,
+// its version will be 1.
+// The version number controls whether the resulting encoded ids include a checksum.
+// Version 1 ids are not compatible with version 2 ids.
+//
+// If own is true, then [Close] will close the underlying database connection.
+// Otherwise, closing the database connection is the caller's responsibility
+// and should not be done until after a call to Close.
+func NewSchemaFromDB(ctx context.Context, db *sql.DB, migrationsTable string, own bool, newcipher func([]byte) (cipher.Block, error)) (*KeyStore, error) {
+	if err := dbutil.MigrateSchema(ctx, db, goose.DialectPostgres, migrations, initSQL, initialCutoff, migrationsTable); err != nil {
 		return nil, errors.Wrap(err, "running migrations")
 	}
 
