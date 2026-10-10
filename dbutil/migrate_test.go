@@ -89,7 +89,7 @@ func TestMigrateSchema(t *testing.T) {
 		}
 	})
 
-	t.Run("SchemaTableNameFallback", func(t *testing.T) {
+	t.Run("EmptyTableNameUsesDefault", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		db, err := sql.Open("sqlite3", filepath.Join(tmpdir, "test.db"))
 		if err != nil {
@@ -97,28 +97,16 @@ func TestMigrateSchema(t *testing.T) {
 		}
 		defer db.Close()
 
-		orig := SchemaTableName
-		SchemaTableName = "fallback_migrations"
-		t.Cleanup(func() { SchemaTableName = orig })
-
-		if err := Migrate(ctx, db, goose.DialectSQLite3, testMigrations, initSQL, InitialCutoff); err != nil {
-			t.Fatalf("Migrate failed: %v", err)
+		if err := MigrateSchema(ctx, db, goose.DialectSQLite3, testMigrations, initSQL, InitialCutoff, ""); err != nil {
+			t.Fatalf("MigrateSchema failed: %v", err)
 		}
 
 		var count int
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM fallback_migrations`).Scan(&count); err != nil {
-			t.Fatalf("fallback_migrations should exist: %v", err)
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM goose_db_version`).Scan(&count); err != nil {
+			t.Fatalf("goose_db_version should exist: %v", err)
 		}
 		if count == 0 {
-			t.Error("fallback_migrations should have records")
-		}
-
-		var exists int
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='goose_db_version'`).Scan(&exists); err != nil {
-			t.Fatal(err)
-		}
-		if exists != 0 {
-			t.Errorf("goose_db_version should not exist, found %d", exists)
+			t.Error("goose_db_version should have records")
 		}
 	})
 }

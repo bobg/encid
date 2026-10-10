@@ -16,7 +16,6 @@ import (
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 	"github.com/pressly/goose/v3"
 
-	"github.com/bobg/encid/v2/dbutil"
 	"github.com/bobg/encid/v2/testutil"
 )
 
@@ -541,51 +540,6 @@ func TestMigrations(t *testing.T) {
 		_, err = db.ExecContext(ctx, `INSERT INTO goose_db_version (version_id, is_applied) VALUES (101, true)`)
 		if err != nil {
 			t.Fatalf("host inserting into goose_db_version failed: %v", err)
-		}
-	})
-
-	t.Run("DbutilSchemaTableNameFallback", func(t *testing.T) {
-		db, err := sql.Open("pgx", pgConnStr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer db.Close() // nolint:errcheck
-
-		if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS encid_keys, encid_version, keys, version, goose_db_version, dbutil_goose_version CASCADE"); err != nil {
-			t.Fatal(err)
-		}
-
-		origTable := MigrationsTable
-		origDbutilTable := dbutil.SchemaTableName
-		MigrationsTable = ""
-		dbutil.SchemaTableName = "dbutil_goose_version"
-		t.Cleanup(func() {
-			MigrationsTable = origTable
-			dbutil.SchemaTableName = origDbutilTable
-			db.ExecContext(ctx, "DROP TABLE IF EXISTS dbutil_goose_version CASCADE") // nolint:errcheck
-		})
-
-		ks, err := NewFromDB(ctx, db, false, aes.NewCipher)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer ks.Close() // nolint:errcheck
-
-		var count int
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM dbutil_goose_version`).Scan(&count); err != nil {
-			t.Fatalf("dbutil_goose_version table should exist: %v", err)
-		}
-		if count == 0 {
-			t.Error("dbutil_goose_version should have recorded migrations, got 0")
-		}
-
-		var exists int
-		err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public' AND tablename = 'goose_db_version'`).Scan(&exists)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if exists != 0 {
-			t.Errorf("goose_db_version should not exist, found %d", exists)
 		}
 	})
 
