@@ -559,7 +559,8 @@ func TestMigrations(t *testing.T) {
 				var opts []goose.ProviderOption
 				opts = append(opts, goose.WithVerbose(false))
 
-				if scenario == "custom_table" {
+				switch scenario {
+				case "custom_table":
 					origTable := MigrationsTable
 					MigrationsTable = "custom_goose_version"
 					t.Cleanup(func() {
@@ -567,7 +568,8 @@ func TestMigrations(t *testing.T) {
 						db.ExecContext(ctx, "DROP TABLE IF EXISTS custom_goose_version CASCADE") // nolint:errcheck
 					})
 					opts = append(opts, goose.WithTableName("custom_goose_version"))
-				} else if scenario == "migrated" {
+
+				case "migrated":
 					_, err = db.ExecContext(ctx, `
 						CREATE TABLE goose_db_version (
 							id SERIAL PRIMARY KEY,

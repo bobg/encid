@@ -35,7 +35,7 @@ func TestMigrateSchema(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer db.Close() // nolint:errcheck
 
 		if err := Migrate(ctx, db, goose.DialectSQLite3, testMigrations, initSQL, InitialCutoff); err != nil {
 			t.Fatalf("Migrate failed: %v", err)
@@ -61,7 +61,7 @@ func TestMigrateSchema(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer db.Close() // nolint:errcheck
 
 		if err := MigrateSchema(ctx, db, goose.DialectSQLite3, testMigrations, initSQL, InitialCutoff, "my_custom_migrations"); err != nil {
 			t.Fatalf("MigrateSchema failed: %v", err)
@@ -95,7 +95,7 @@ func TestMigrateSchema(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer db.Close() // nolint:errcheck
 
 		if err := MigrateSchema(ctx, db, goose.DialectSQLite3, testMigrations, initSQL, InitialCutoff, ""); err != nil {
 			t.Fatalf("MigrateSchema failed: %v", err)

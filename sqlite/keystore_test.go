@@ -437,12 +437,14 @@ func TestMigrations(t *testing.T) {
 				var opts []goose.ProviderOption
 				opts = append(opts, goose.WithVerbose(false))
 
-				if scenario == "custom_table" {
+				switch scenario {
+				case "custom_table":
 					origTable := MigrationsTable
 					MigrationsTable = "custom_goose_version"
 					t.Cleanup(func() { MigrationsTable = origTable })
 					opts = append(opts, goose.WithTableName("custom_goose_version"))
-				} else if scenario == "migrated" {
+
+				case "migrated":
 					_, err = db.ExecContext(ctx, `
 						CREATE TABLE goose_db_version (
 							id INTEGER PRIMARY KEY AUTOINCREMENT,
