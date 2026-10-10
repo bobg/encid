@@ -278,10 +278,6 @@ func TestMigrations(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpdir) // nolint:errcheck
 
-		origTable := MigrationsTable
-		MigrationsTable = "custom_goose_version"
-		t.Cleanup(func() { MigrationsTable = origTable })
-
 		filename := filepath.Join(tmpdir, "keystore.db")
 		db, err := sql.Open("sqlite3", filename)
 		if err != nil {
@@ -289,7 +285,7 @@ func TestMigrations(t *testing.T) {
 		}
 		defer db.Close() // nolint:errcheck
 
-		ks, err := NewFromDB(ctx, db, false, aes.NewCipher)
+		ks, err := NewSchemaFromDB(ctx, db, "custom_goose_version", false, aes.NewCipher)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -326,6 +322,27 @@ func TestMigrations(t *testing.T) {
 		if typ != 1 {
 			t.Errorf("got key type %d, want 1", typ)
 		}
+
+		// Also verify NewSchema constructor.
+		filename2 := filepath.Join(tmpdir, "keystore2.db")
+		ks2, err := NewSchema(ctx, filename2, "custom_goose_version_2", aes.NewCipher)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ks2.Close() // nolint:errcheck
+
+		db2, err := sql.Open("sqlite3", filename2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db2.Close() // nolint:errcheck
+
+		if err := db2.QueryRowContext(ctx, `SELECT COUNT(*) FROM custom_goose_version_2`).Scan(&count); err != nil {
+			t.Fatalf("custom_goose_version_2 table should exist: %v", err)
+		}
+		if count == 0 {
+			t.Error("custom_goose_version_2 table should have recorded migrations, got 0")
+		}
 	})
 
 	t.Run("CoexistingGooseSchemas", func(t *testing.T) {
@@ -361,11 +378,7 @@ func TestMigrations(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		origTable := MigrationsTable
-		MigrationsTable = "encid_schema_version"
-		t.Cleanup(func() { MigrationsTable = origTable })
-
-		ks, err := NewFromDB(ctx, db, false, aes.NewCipher)
+		ks, err := NewSchemaFromDB(ctx, db, "encid_schema_version", false, aes.NewCipher)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -437,12 +450,11 @@ func TestMigrations(t *testing.T) {
 				var opts []goose.ProviderOption
 				opts = append(opts, goose.WithVerbose(false))
 
+				var migrationsTable string
 				switch scenario {
 				case "custom_table":
-					origTable := MigrationsTable
-					MigrationsTable = "custom_goose_version"
-					t.Cleanup(func() { MigrationsTable = origTable })
-					opts = append(opts, goose.WithTableName("custom_goose_version"))
+					migrationsTable = "custom_goose_version"
+					opts = append(opts, goose.WithTableName(migrationsTable))
 
 				case "migrated":
 					_, err = db.ExecContext(ctx, `
@@ -465,7 +477,7 @@ func TestMigrations(t *testing.T) {
 					}
 				}
 
-				ks, err := NewFromDB(ctx, db, false, aes.NewCipher)
+				ks, err := NewSchemaFromDB(ctx, db, migrationsTable, false, aes.NewCipher)
 				if err != nil {
 					t.Fatal(err)
 				}
