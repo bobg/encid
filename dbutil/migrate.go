@@ -3,7 +3,6 @@ package dbutil
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"io/fs"
 
 	"github.com/bobg/errors"
@@ -66,16 +65,6 @@ func MigrateSchema(ctx context.Context, db *sql.DB, dialect goose.Dialect, migra
 	}
 
 	if !anyApplied {
-		if migrationsTableName != goose.DefaultTablename {
-			existingSchema, err := hasExistingEncidSchema(ctx, db, dialect, status)
-			if err != nil {
-				return errors.Wrap(err, "checking for an existing encid schema")
-			}
-			if existingSchema {
-				return fmt.Errorf("existing encid schema found; use its existing migrations table instead of %q", migrationsTableName)
-			}
-		}
-
 		store, err := database.NewStore(dialect, migrationsTableName)
 		if err != nil {
 			return errors.Wrap(err, "creating goose store")
@@ -114,65 +103,4 @@ func MigrateSchema(ctx context.Context, db *sql.DB, dialect goose.Dialect, migra
 	}
 
 	return nil
-}
-
-func hasExistingEncidSchema(ctx context.Context, db *sql.DB, dialect goose.Dialect, status []*goose.MigrationStatus) (bool, error) {
-	var rows *sql.Rows
-	var err error
-	switch dialect {
-	case goose.DialectSQLite3:
-		rows, err = db.QueryContext(ctx, `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('keys', 'version', 'encid_keys', 'encid_version', 'goose_db_version')`)
-	case goose.DialectPostgres:
-		rows, err = db.QueryContext(ctx, `SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name IN ('keys', 'version', 'encid_keys', 'encid_version', 'goose_db_version')`)
-	default:
-		return false, fmt.Errorf("unsupported dialect %q", dialect)
-	}
-	if err != nil {
-		return false, err
-	}
-	defer rows.Close()
-
-	tables := make(map[string]bool)
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return false, err
-		}
-		tables[name] = true
-	}
-	if err := rows.Err(); err != nil {
-		return false, err
-	}
-
-	if tables["encid_keys"] || tables["encid_version"] {
-		return true, nil
-	}
-	if (!tables["keys"] && !tables["version"]) || !tables[goose.DefaultTablename] {
-		return false, nil
-	}
-
-	rows, err = db.QueryContext(ctx, `SELECT version_id, is_applied FROM goose_db_version`)
-	if err != nil {
-		return false, err
-	}
-	defer rows.Close()
-
-	encidVersions := make(map[int64]bool, len(status))
-	for _, s := range status {
-		encidVersions[s.Source.Version] = true
-	}
-	for rows.Next() {
-		var version int64
-		var applied bool
-		if err := rows.Scan(&version, &applied); err != nil {
-			return false, err
-		}
-		if applied && encidVersions[version] {
-			return true, nil
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return false, err
-	}
-	return false, nil
 }

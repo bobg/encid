@@ -89,46 +89,6 @@ func TestMigrateSchema(t *testing.T) {
 		}
 	})
 
-	t.Run("CustomTableRejectsExistingSchema", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		db, err := sql.Open("sqlite3", filepath.Join(tmpdir, "test.db"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer db.Close() // nolint:errcheck
-
-		_, err = db.ExecContext(ctx, `
-			CREATE TABLE keys (id INTEGER PRIMARY KEY, typ INTEGER, k BLOB);
-			CREATE TABLE version (singleton INTEGER PRIMARY KEY, version INTEGER);
-			CREATE TABLE goose_db_version (version_id INTEGER NOT NULL, is_applied BOOLEAN NOT NULL);
-			INSERT INTO keys (id, typ, k) VALUES (1, 10, X'01');
-			INSERT INTO goose_db_version (version_id, is_applied) VALUES (0, 1), (20261001000000, 1);
-		`)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := MigrateSchema(ctx, db, goose.DialectSQLite3, testMigrations, initSQL, InitialCutoff, "my_custom_migrations"); err == nil {
-			t.Fatal("MigrateSchema should reject an existing schema with an empty custom migrations table")
-		}
-
-		var count int
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM keys`).Scan(&count); err != nil {
-			t.Fatalf("existing keys table should remain accessible: %v", err)
-		}
-		if count != 1 {
-			t.Errorf("existing keys table should retain its row, got %d", count)
-		}
-
-		var exists int
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'encid_keys'`).Scan(&exists); err != nil {
-			t.Fatal(err)
-		}
-		if exists != 0 {
-			t.Error("encid_keys should not be created before rejecting the existing schema")
-		}
-	})
-
 	t.Run("EmptyTableNameUsesDefault", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		db, err := sql.Open("sqlite3", filepath.Join(tmpdir, "test.db"))
