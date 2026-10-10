@@ -41,7 +41,7 @@ func New(ctx context.Context, connStr string, newcipher func([]byte) (cipher.Blo
 	return NewSchema(ctx, connStr, "", newcipher)
 }
 
-// New creates a new PostgreSQL-backed keystore using the given connection string.
+// NewSchema creates a new PostgreSQL-backed keystore using the given connection string.
 //
 // The newcipher function takes a key and returns a cipher for encrypting and decrypting.
 // If newcipher is nil, it defaults to [aes.NewCipher].
