@@ -176,7 +176,7 @@ type KeyStore struct {
 var _ encid.KeyStore = &KeyStore{}
 
 func (ks *KeyStore) DecoderByID(ctx context.Context, id int64) (typ int, dec encid.Decrypter, err error) {
-	const q = `SELECT typ, k FROM encid_keys WHERE id = $1`
+	const q = `SELECT typ, k FROM encid_keys WHERE id = ?1`
 
 	var k []byte
 
@@ -197,7 +197,7 @@ func (ks *KeyStore) DecoderByID(ctx context.Context, id int64) (typ int, dec enc
 }
 
 func (ks *KeyStore) EncoderByType(ctx context.Context, typ int) (id int64, enc encid.Encrypter, err error) {
-	const q = `SELECT id, k FROM encid_keys WHERE typ = $1 ORDER BY id DESC LIMIT 1`
+	const q = `SELECT id, k FROM encid_keys WHERE typ = ?1 ORDER BY id DESC LIMIT 1`
 
 	var k []byte
 
@@ -227,7 +227,7 @@ func (ks *KeyStore) NewKey(ctx context.Context, typ, keysize int) (int64, error)
 		return 0, errors.Wrap(err, "generating key")
 	}
 
-	const q = `INSERT INTO encid_keys (typ, k) VALUES ($1, $2)`
+	const q = `INSERT INTO encid_keys (typ, k) VALUES (?1, ?2)`
 
 	res, err := ks.db.ExecContext(ctx, q, typ, k)
 	if err != nil {
